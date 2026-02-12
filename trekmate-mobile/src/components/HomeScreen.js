@@ -203,13 +203,13 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
     },
     welcomeTitle: {
-        fontSize: 24,
+        fontSize: 15,
         fontFamily: 'Syne-Bold',
         color: '#000',
         textTransform: 'uppercase',
     },
     userName: {
-        fontSize: 24,
+        fontSize: 18,
         fontFamily: 'Syne-Bold',
         color: '#4B5D5E',
         marginTop: -2,
@@ -251,7 +251,7 @@ const styles = StyleSheet.create({
         marginBottom: 15,
     },
     sectionTitle: {
-        fontSize: 22,
+        fontSize: 14,
         fontFamily: 'Syne-Bold',
         color: '#000',
     },

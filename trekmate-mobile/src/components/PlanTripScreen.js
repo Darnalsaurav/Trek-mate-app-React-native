@@ -191,7 +191,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     headerTitle: {
-        fontSize: 24,
+        fontSize: 20,
         fontFamily: 'Syne-ExtraBold',
         color: '#1C3D3E',
     },

@@ -119,9 +119,10 @@ const styles = StyleSheet.create({
         paddingVertical: 16,
     },
     headerTitle: {
-        fontSize: 28,
+        fontSize: 20,
         fontFamily: 'Syne-ExtraBold',
         color: '#1C3D3E',
+        alignItems: 'center',
     },
     iconBtn: {
         padding: 4,

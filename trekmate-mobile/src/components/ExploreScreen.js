@@ -34,17 +34,7 @@ const ExploreScreen = ({ navigation }) => {
             </View>
 
             {/* Search Bar - Matching Home */}
-            <View style={styles.searchContainer}>
-                <View style={styles.searchBar}>
-                    <Ionicons name="search" size={24} color="#1C3D3E" style={styles.searchIcon} />
-                    <TextInput
-                        style={styles.searchInput}
-                        placeholder="Search the destination"
-                        placeholderTextColor="#999"
-                    />
-                </View>
-            </View>
-
+          
             {/* Destination Cards */}
             <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 120 }}>
                 <View style={styles.cardsContainer}>
@@ -86,7 +76,7 @@ const styles = StyleSheet.create({
         paddingBottom: 20,
     },
     headerTitle: {
-        fontSize: 28,
+        fontSize: 20,
         fontFamily: 'Syne-ExtraBold',
         color: '#1C3D3E',
         textAlign: 'center',
@@ -152,7 +142,7 @@ const styles = StyleSheet.create({
         right: 20,
     },
     cardName: {
-        fontSize: 26,
+        fontSize: 18,
         fontFamily: 'Syne-Bold',
         color: '#fff',
         marginBottom: 4,

@@ -212,7 +212,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     title: {
-        fontSize: 32,
+        fontSize: 30,
         fontFamily: 'Syne-ExtraBold',
         color: '#1C3D3E',
         marginBottom: 20,
