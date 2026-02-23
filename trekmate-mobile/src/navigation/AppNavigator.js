@@ -50,10 +50,10 @@ export default function AppNavigator() {
     const [showSplash, setShowSplash] = useState(true);
 
     useEffect(() => {
-        // Show splash for 3 seconds
+        // Show splash for 10 seconds
         const splashTimer = setTimeout(() => {
             setShowSplash(false);
-        }, 3000);
+        }, 10000);
 
         // Listen to auth state
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {

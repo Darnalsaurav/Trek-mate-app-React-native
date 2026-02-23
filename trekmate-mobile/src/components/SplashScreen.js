@@ -1,18 +1,18 @@
 import React from 'react';
-import { View, Text, StyleSheet, StatusBar } from 'react-native';
+import { View, Image, StyleSheet, StatusBar, Dimensions } from 'react-native';
+
+const { width } = Dimensions.get('window');
 
 const SplashScreen = () => {
     return (
         <View style={styles.container}>
-            <StatusBar barStyle="light-content" />
+            <StatusBar barStyle="light-content" backgroundColor="#1C3D3E" />
             <View style={styles.logoContainer}>
-                <View style={styles.brandText}>
-                    <Text style={styles.trek}>Trek</Text>
-                    <Text style={styles.mate}>MATE</Text>
-                </View>
-                <View style={styles.taglineBorder}>
-                    <Text style={styles.tagline}>ADVENTURE AWAITS</Text>
-                </View>
+                <Image
+                    source={require('../../assets/splash_logo.png')}
+                    style={styles.logo}
+                    resizeMode="contain"
+                />
             </View>
         </View>
     );
@@ -26,36 +26,14 @@ const styles = StyleSheet.create({
         alignItems: 'center',
     },
     logoContainer: {
+        width: width * 0.7,
+        height: width * 0.7,
+        justifyContent: 'center',
         alignItems: 'center',
     },
-    brandText: {
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    trek: {
-        fontSize: 64,
-        fontFamily: 'Syne-ExtraBold',
-        color: '#fff',
-    },
-    mate: {
-        fontSize: 64,
-        fontFamily: 'Syne-Bold',
-        color: 'rgba(255,255,255,0.6)',
-        marginLeft: 4,
-    },
-    taglineBorder: {
-        marginTop: 10,
-        paddingHorizontal: 15,
-        paddingVertical: 5,
-        borderWidth: 1,
-        borderColor: 'rgba(255,255,255,0.3)',
-        borderRadius: 20,
-    },
-    tagline: {
-        fontSize: 12,
-        fontFamily: 'Syne-Bold',
-        color: '#fff',
-        letterSpacing: 4,
+    logo: {
+        width: '100%',
+        height: '100%',
     },
 });
 
