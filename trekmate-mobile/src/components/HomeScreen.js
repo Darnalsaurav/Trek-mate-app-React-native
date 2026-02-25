@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -9,58 +9,140 @@ import {
     TextInput,
     Dimensions,
     StatusBar,
-    SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { auth } from '../config/firebase';
+import { getUnreadCount, subscribeToNotifications, setUnreadCount } from '../utils/notificationStore';
+import { getPlannedTrips, subscribeToPlannedTrips } from '../utils/destinationStore';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
 
 const HomeScreen = ({ navigation }) => {
+    const [userName, setUserName] = useState(
+        auth.currentUser?.displayName ||
+        auth.currentUser?.email?.split('@')[0] ||
+        'User'
+    );
+    const [profileImage, setProfileImage] = useState(auth.currentUser?.photoURL);
+    const [unreadCount, setUnreadCountState] = useState(getUnreadCount());
+    const [plannedTrips, setPlannedTrips] = useState(getPlannedTrips());
+
+    useEffect(() => {
+        const unsubscribe = subscribeToNotifications((count) => {
+            setUnreadCountState(count);
+        });
+        return unsubscribe;
+    }, []);
+
+    useEffect(() => {
+        const unsubscribe = subscribeToPlannedTrips((trips) => {
+            setPlannedTrips([...trips]);
+        });
+        return unsubscribe;
+    }, []);
+
+    useEffect(() => {
+        const checkFirstTime = async () => {
+            try {
+                const hasSeenWelcome = await AsyncStorage.getItem('has_seen_welcome');
+                if (!hasSeenWelcome) {
+                    setUnreadCount(1);
+                    await AsyncStorage.setItem('has_seen_welcome', 'true');
+                }
+            } catch (error) {
+                console.log('Error checking first time:', error);
+            }
+        };
+        checkFirstTime();
+    }, []);
+
+    useEffect(() => {
+        const user = auth.currentUser;
+        if (user) {
+            // Force a reload to catch the displayName or photoURL if it was just set
+            user.reload().then(() => {
+                const updatedUser = auth.currentUser;
+                setUserName(updatedUser?.displayName || updatedUser?.email?.split('@')[0] || 'User');
+                setProfileImage(updatedUser?.photoURL);
+            }).catch(err => console.log('Error reloading user:', err));
+        }
+    }, [navigation]); // Reload when navigating (e.g., coming back from Profile)
+
     const recommendedDestinations = [
         {
             id: 1,
-            name: 'Tilicho lake',
+            name: 'TILICHO LAKE',
             location: 'Manang District',
-            image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80'
+            image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80',
+            description: 'Tilicho Lake is situated at an altitude of 4,919 meters in the Annapurna range of the Himalayas. It is often called the highest lake in the world for its size. The trek offers stunning views of Annapurna II, Annapurna III, and Gangapurna.',
+            distance: '15km',
+            duration: '14hrs',
+            elevation: '4919m'
         },
         {
             id: 2,
-            name: 'Khumai Dada',
+            name: 'KHUMAI DADA',
             location: 'Pokhara District',
-            image: 'https://images.unsplash.com/photo-1544735716-392fe2489ffa?w=800&q=80'
+            image: 'https://images.unsplash.com/photo-1544735716-392fe2489ffa?w=800&q=80',
+            description: 'Khumai Dada is a hidden gem in the Machhapuchhre region. This short yet rewarding trek provides a closer look at the iconic Fish Tail mountain and offers a panoramic view of the Pokhara valley.',
+            distance: '8km',
+            duration: '8hrs',
+            elevation: '3245m'
         },
         {
             id: 3,
-            name: 'Everest View',
+            name: 'EVEREST VIEW',
             location: 'Solukhumbu District',
-            image: 'https://images.unsplash.com/photo-1571769267292-c07c8eadb1c3?w=800&q=80'
+            image: 'https://images.unsplash.com/photo-1571769267292-c07c8eadb1c3?w=800&q=80',
+            description: 'The Everest View trek is perfect for those who want to see the world\'s highest peak without the grueling climb to Base Camp. It passes through Sherpa villages and provides breathtaking vistas of Everest, Lhotse, and Ama Dablam.',
+            distance: '12km',
+            duration: '10hrs',
+            elevation: '3880m'
         }
     ];
 
     const upcomingTreks = [
         {
-            id: 1,
-            name: 'Langtang',
+            id: 4,
+            name: 'LANGTANG VALLEY',
             location: 'Rasuwa District',
-            image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80'
+            image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80',
+            description: 'Known as the valley of glaciers, Langtang offers a rich cultural experience with its Tamang heritage and spectacular mountain scenery. It is one of the most accessible trekking regions from Kathmandu.',
+            distance: '18km',
+            duration: '16hrs',
+            elevation: '3870m'
         },
         {
-            id: 2,
-            name: 'Annapurna Base camp',
+            id: 5,
+            name: 'ANNAPURNA BASE CAMP',
             location: 'Pokhara District',
-            image: 'https://images.unsplash.com/photo-1518548419970-58e3b4079ab2?w=800&q=80'
+            image: 'https://images.unsplash.com/photo-1518548419970-58e3b4079ab2?w=800&q=80',
+            description: 'ABC Trek is one of the most popular treks in Nepal. It leads you into a natural amphitheater of towering peaks including Annapurna I, the world\'s tenth highest mountain.',
+            distance: '22km',
+            duration: '20hrs',
+            elevation: '4130m'
         },
         {
-            id: 3,
-            name: 'Manaslu Circuit',
+            id: 6,
+            name: 'MANASLU CIRCUIT',
             location: 'Gorkha District',
-            image: 'https://images.unsplash.com/photo-1486870591958-9b9d0d1dda99?w=800&q=80'
+            image: 'https://images.unsplash.com/photo-1486870591958-9b9d0d1dda99?w=800&q=80',
+            description: 'The Manaslu Circuit is a restricted area trek that skirts the world\'s eighth highest mountain. It offers raw mountain beauty and a deep dive into the Tibetan-style culture of the Upper Gorkha region.',
+            distance: '25km',
+            duration: '24hrs',
+            elevation: '5106m'
         }
     ];
 
     const DestinationCard = ({ destination }) => (
-        <TouchableOpacity style={styles.card} activeOpacity={0.9}>
+        <TouchableOpacity
+            style={styles.card}
+            activeOpacity={0.9}
+            onPress={() => navigation.navigate('DestinationDetail', { destination })}
+        >
             <Image
                 source={{ uri: destination.image }}
                 style={styles.cardImage}
@@ -89,17 +171,25 @@ const HomeScreen = ({ navigation }) => {
                             <View style={styles.profileRow}>
                                 <View style={styles.avatarBorder}>
                                     <Image
-                                        source={{ uri: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=200&q=80' }}
+                                        source={profileImage ? { uri: profileImage } : { uri: 'https://cdn-icons-png.flaticon.com/512/149/149071.png' }}
                                         style={styles.avatar}
                                     />
                                 </View>
                                 <View style={styles.welcomeContainer}>
                                     <Text style={styles.welcomeTitle}>WELCOME BACK</Text>
-                                    <Text style={styles.userName}>Saurav Darnal</Text>
+                                    <Text style={styles.userName}>{userName}</Text>
                                 </View>
                             </View>
-                            <TouchableOpacity style={styles.notificationBtn}>
+                            <TouchableOpacity
+                                style={styles.notificationBtn}
+                                onPress={() => navigation.navigate('Notifications')}
+                            >
                                 <Ionicons name="notifications-outline" size={30} color="#1C3D3E" />
+                                {unreadCount > 0 && (
+                                    <View style={styles.badge}>
+                                        <Text style={styles.badgeText}>{unreadCount}</Text>
+                                    </View>
+                                )}
                             </TouchableOpacity>
                         </View>
                     </View>
@@ -140,15 +230,23 @@ const HomeScreen = ({ navigation }) => {
                         <View style={styles.sectionHeader}>
                             <Text style={styles.sectionTitle}>Upcoming treks</Text>
                         </View>
-                        <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={styles.cardList}
-                        >
-                            {upcomingTreks.map((trek) => (
-                                <DestinationCard key={trek.id} destination={trek} />
-                            ))}
-                        </ScrollView>
+                        {plannedTrips.length === 0 ? (
+                            <View style={styles.emptyUpcoming}>
+                                <Ionicons name="calendar-outline" size={36} color="#ccc" />
+                                <Text style={styles.emptyUpcomingText}>No upcoming treks yet.{'
+'}Plan one to see it here!</Text>
+                            </View>
+                        ) : (
+                            <ScrollView
+                                horizontal
+                                showsHorizontalScrollIndicator={false}
+                                contentContainerStyle={styles.cardList}
+                            >
+                                {plannedTrips.map((trek) => (
+                                    <DestinationCard key={trek.id} destination={trek} />
+                                ))}
+                            </ScrollView>
+                        )}
                     </View>
 
                     {/* Padding for Floating Nav */}
@@ -304,6 +402,25 @@ const styles = StyleSheet.create({
         fontFamily: 'Syne-Regular',
         color: '#666',
         textAlign: 'center',
+    },
+    badge: {
+        position: 'absolute',
+        top: 2,
+        right: 2,
+        backgroundColor: '#FF3B30',
+        width: 18,
+        height: 18,
+        borderRadius: 9,
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderWidth: 2,
+        borderColor: '#fff',
+    },
+    badgeText: {
+        color: '#fff',
+        fontSize: 10,
+        fontFamily: 'Syne-Bold',
+        lineHeight: 12,
     },
 });
 

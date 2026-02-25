@@ -21,6 +21,8 @@ import DestinationDetail from '../components/DestinationDetail';
 import ChatScreen from '../components/ChatScreen';
 import MapScreen from '../components/MapScreen';
 import FloatingNavbar from '../components/FloatingNavbar';
+import NotificationsScreen from '../components/NotificationsScreen';
+import WeatherScreen from '../components/WeatherScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -50,10 +52,10 @@ export default function AppNavigator() {
     const [showSplash, setShowSplash] = useState(true);
 
     useEffect(() => {
-        // Show splash for 10 seconds
+        // Show splash for 6 seconds
         const splashTimer = setTimeout(() => {
             setShowSplash(false);
-        }, 10000);
+        }, 6000);
 
         // Listen to auth state
         const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
@@ -97,6 +99,8 @@ export default function AppNavigator() {
                         <Stack.Screen name="DestinationDetail" component={DestinationDetail} />
                         <Stack.Screen name="Chat" component={ChatScreen} />
                         <Stack.Screen name="Map" component={MapScreen} />
+                        <Stack.Screen name="Notifications" component={NotificationsScreen} />
+                        <Stack.Screen name="Weather" component={WeatherScreen} />
                     </Stack.Group>
                 ) : (
                     // Unauthenticated Stack

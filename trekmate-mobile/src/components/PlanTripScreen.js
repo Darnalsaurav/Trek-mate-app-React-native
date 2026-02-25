@@ -8,18 +8,19 @@ import {
     ScrollView,
     KeyboardAvoidingView,
     Platform,
-    SafeAreaView,
     Image,
     Alert,
     Keyboard,
     TouchableWithoutFeedback,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { addDestination } from '../utils/destinationStore';
+import { addDestination, addPlannedTrip } from '../utils/destinationStore';
 
 const PlanTripScreen = ({ navigation }) => {
     const [destination, setDestination] = useState('');
+    const [district, setDistrict] = useState('');
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [image, setImage] = useState(null);
@@ -43,7 +44,7 @@ const PlanTripScreen = ({ navigation }) => {
         }
     };
 
-    const isFormValid = destination.trim() !== '' && startDate.trim() !== '' && endDate.trim() !== '';
+    const isFormValid = destination.trim() !== '' && district.trim() !== '' && startDate.trim() !== '' && endDate.trim() !== '';
 
     const handleConfirmTrip = () => {
         if (!isFormValid) {
@@ -51,13 +52,20 @@ const PlanTripScreen = ({ navigation }) => {
             return;
         }
 
-        addDestination({
+        const tripData = {
             name: destination,
-            location: 'Planned Trek',
+            location: district.trim() ? `${district.trim()} District` : 'Nepal',
             image: image || 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1200&q=80',
-        });
+            startDate: startDate.trim(),
+            endDate: endDate.trim(),
+        };
 
-        Alert.alert('Success!', 'Your trek has been planned and added to Explore.', [
+        // Add to Explore destinations
+        addDestination(tripData);
+        // Add to Upcoming Treks on Home
+        addPlannedTrip(tripData);
+
+        Alert.alert('Trip Confirmed! 🎉', `Your trek to ${destination} has been planned.`, [
             { text: 'OK', onPress: () => navigation.navigate('ExploreTab') }
         ]);
     };
@@ -95,6 +103,21 @@ const PlanTripScreen = ({ navigation }) => {
                                             value={destination}
                                             onChangeText={setDestination}
                                             placeholder="E.g. Annapurna Base Camp"
+                                            placeholderTextColor="#999"
+                                        />
+                                    </View>
+                                </View>
+
+                                {/* District Input */}
+                                <View style={styles.inputSection}>
+                                    <Text style={styles.label}>District</Text>
+                                    <View style={styles.inputContainer}>
+                                        <Ionicons name="map-outline" size={22} color="#1C3D3E" style={styles.inputIcon} />
+                                        <TextInput
+                                            style={styles.input}
+                                            value={district}
+                                            onChangeText={setDistrict}
+                                            placeholder="E.g. Manang, Pokhara, Gorkha"
                                             placeholderTextColor="#999"
                                         />
                                     </View>

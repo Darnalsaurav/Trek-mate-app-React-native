@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
     View,
     Text,
@@ -7,40 +7,57 @@ import {
     Image,
     TouchableOpacity,
     TextInput,
-    SafeAreaView,
+    ActivityIndicator,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { auth, db } from '../config/firebase';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 
 const MessagesScreen = ({ navigation }) => {
-    const [chats, setChats] = useState([
-        {
-            id: '1',
-            name: 'Gaurav',
-            avatar: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&q=80',
-            lastMessage: 'Are we still going to Everest Base Camp?',
-            time: '2m ago',
-            unread: 2,
-            isOnline: true
-        },
-        {
-            id: '2',
-            name: 'Saurav',
-            avatar: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=200&q=80',
-            lastMessage: 'I found a great guide for our trip!',
-            time: '1h ago',
-            unread: 0,
-            isOnline: false
-        },
-        {
-            id: '3',
-            name: 'Anjali',
-            avatar: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?w=200&q=80',
-            lastMessage: 'Can you send me the packing list?',
-            time: 'Yesterday',
-            unread: 0,
-            isOnline: true
+    const [users, setUsers] = useState([]);
+    const [loading, setLoading] = useState(true);
+    const [searchQuery, setSearchQuery] = useState('');
+
+    useEffect(() => {
+        if (!auth.currentUser) {
+            setLoading(false);
+            return;
         }
-    ]);
+
+        const q = query(
+            collection(db, 'users'),
+            where('uid', '!=', auth.currentUser.uid)
+        );
+
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const userList = snapshot.docs.map(doc => {
+                const data = doc.data();
+                const email = data.email || '';
+                return {
+                    id: doc.id,
+                    ...data,
+                    name: data.displayName || (email ? email.split('@')[0] : 'Unknown Trekker'),
+                    email: email,
+                    avatar: data.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png',
+                    lastMessage: 'Tap to start chatting!',
+                    time: '',
+                    unread: 0,
+                };
+            });
+            setUsers(userList);
+            setLoading(false);
+        });
+
+        return () => unsubscribe();
+    }, []);
+
+    const filteredUsers = users.filter(user => {
+        const name = user.name || '';
+        const email = user.email || '';
+        const queryVal = searchQuery.toLowerCase();
+        return name.toLowerCase().includes(queryVal) || email.toLowerCase().includes(queryVal);
+    });
 
     const renderChatItem = ({ item }) => (
         <TouchableOpacity
@@ -62,7 +79,7 @@ const MessagesScreen = ({ navigation }) => {
                         style={[styles.previewText, item.unread > 0 ? styles.unreadText : null]}
                         numberOfLines={1}
                     >
-                        {item.lastMessage}
+                        {searchQuery ? item.email : item.lastMessage}
                     </Text>
                     {item.unread > 0 ? (
                         <View style={styles.unreadBadge}>
@@ -74,6 +91,16 @@ const MessagesScreen = ({ navigation }) => {
         </TouchableOpacity>
     );
 
+    if (!auth.currentUser) {
+        return (
+            <SafeAreaView style={styles.container}>
+                <View style={[styles.container, { justifyContent: 'center', alignItems: 'center' }]}>
+                    <Text style={{ fontFamily: 'Syne-Regular', color: '#1C3D3E' }}>Please log in to see messages.</Text>
+                </View>
+            </SafeAreaView>
+        );
+    }
+
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
@@ -83,7 +110,6 @@ const MessagesScreen = ({ navigation }) => {
                 </TouchableOpacity>
             </View>
 
-            {/* Search */}
             <View style={styles.searchContainer}>
                 <View style={styles.searchBar}>
                     <Ionicons name="search" size={24} color="#1C3D3E" style={styles.searchIcon} />
@@ -91,17 +117,29 @@ const MessagesScreen = ({ navigation }) => {
                         placeholder="Search messages..."
                         style={styles.searchInput}
                         placeholderTextColor="#999"
+                        value={searchQuery}
+                        onChangeText={setSearchQuery}
+                        autoCapitalize="none"
+                        autoCorrect={false}
                     />
                 </View>
             </View>
 
-            {/* List */}
-            <FlatList
-                data={chats}
-                renderItem={renderChatItem}
-                keyExtractor={item => item.id}
-                contentContainerStyle={[styles.listContent, { paddingBottom: 120 }]}
-            />
+            {loading ? (
+                <ActivityIndicator size="large" color="#1C3D3E" style={{ marginTop: 20 }} />
+            ) : (
+                <FlatList
+                    data={filteredUsers}
+                    renderItem={renderChatItem}
+                    keyExtractor={item => item.id}
+                    contentContainerStyle={[styles.listContent, { paddingBottom: 120 }]}
+                    ListEmptyComponent={() => (
+                        <View style={{ alignItems: 'center', marginTop: 50 }}>
+                            <Text style={{ fontFamily: 'Syne-Regular', color: '#666' }}>No users found</Text>
+                        </View>
+                    )}
+                />
+            )}
         </SafeAreaView>
     );
 };
@@ -122,7 +160,6 @@ const styles = StyleSheet.create({
         fontSize: 20,
         fontFamily: 'Syne-ExtraBold',
         color: '#1C3D3E',
-        alignItems: 'center',
     },
     iconBtn: {
         padding: 4,

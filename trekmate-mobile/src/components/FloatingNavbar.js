@@ -4,11 +4,37 @@ import { Ionicons } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
 
-const FloatingNavbar = ({ state, navigation }) => {
-    // Get the current active route name from the navigator state
-    const activeRouteName = state?.routes[state.index]?.name || 'Home';
+const NavItem = ({ tab, isActive, onPress }) => {
+    const scaleValue = useRef(new Animated.Value(isActive ? 1.2 : 1)).current;
 
-    // Animation value for tab switching
+    useEffect(() => {
+        Animated.spring(scaleValue, {
+            toValue: isActive ? 1.2 : 1,
+            friction: 4,
+            useNativeDriver: true,
+        }).start();
+    }, [isActive]);
+
+    return (
+        <TouchableOpacity
+            style={styles.navItem}
+            activeOpacity={0.8}
+            onPress={onPress}
+        >
+            <Animated.View style={{ transform: [{ scale: scaleValue }], alignItems: 'center' }}>
+                <Ionicons
+                    name={isActive ? tab.icon : tab.iconOutline}
+                    size={28}
+                    color={isActive ? '#fff' : 'rgba(255,255,255,0.45)'}
+                />
+                {isActive && <View style={styles.activeDot} />}
+            </Animated.View>
+        </TouchableOpacity>
+    );
+};
+
+const FloatingNavbar = ({ state, navigation }) => {
+    const activeRouteName = state?.routes[state.index]?.name || 'Home';
     const fadeAnim = useRef(new Animated.Value(1)).current;
     const [keyboardVisible, setKeyboardVisible] = React.useState(false);
 
@@ -23,7 +49,6 @@ const FloatingNavbar = ({ state, navigation }) => {
     }, []);
 
     useEffect(() => {
-        // Trigger a subtle fade-in when the active route changes
         fadeAnim.setValue(0.6);
         Animated.spring(fadeAnim, {
             toValue: 1,
@@ -57,37 +82,14 @@ const FloatingNavbar = ({ state, navigation }) => {
     return (
         <View style={styles.floatingNavContainer}>
             <Animated.View style={[styles.floatingNav, { opacity: fadeAnim }]}>
-                {tabs.map((tab) => {
-                    const isActive = activeRouteName === tab.name;
-                    // Scale animation for the "hover" effect
-                    const scaleValue = useRef(new Animated.Value(isActive ? 1.2 : 1)).current;
-
-                    useEffect(() => {
-                        Animated.spring(scaleValue, {
-                            toValue: isActive ? 1.2 : 1,
-                            friction: 4,
-                            useNativeDriver: true,
-                        }).start();
-                    }, [isActive]);
-
-                    return (
-                        <TouchableOpacity
-                            key={tab.name}
-                            style={styles.navItem}
-                            activeOpacity={0.8}
-                            onPress={() => handlePress(tab.name)}
-                        >
-                            <Animated.View style={{ transform: [{ scale: scaleValue }], alignItems: 'center' }}>
-                                <Ionicons
-                                    name={isActive ? tab.icon : tab.iconOutline}
-                                    size={28}
-                                    color={isActive ? '#fff' : 'rgba(255,255,255,0.45)'}
-                                />
-                                {isActive && <View style={styles.activeDot} />}
-                            </Animated.View>
-                        </TouchableOpacity>
-                    );
-                })}
+                {tabs.map((tab) => (
+                    <NavItem
+                        key={tab.name}
+                        tab={tab}
+                        isActive={activeRouteName === tab.name}
+                        onPress={() => handlePress(tab.name)}
+                    />
+                ))}
             </Animated.View>
         </View>
     );

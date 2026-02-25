@@ -13,8 +13,10 @@ import {
     Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { auth } from '../config/firebase';
+import { auth, db } from '../config/firebase';
 import { createUserWithEmailAndPassword, updateProfile } from 'firebase/auth';
+import { doc, setDoc } from 'firebase/firestore';
+import { setUnreadCount } from '../utils/notificationStore';
 
 const { width, height } = Dimensions.get('window');
 
@@ -52,6 +54,19 @@ const SignUpScreen = ({ navigation }) => {
                     displayName: name,
                 });
             }
+
+            // Create user document in Firestore
+            await setDoc(doc(db, 'users', user.uid), {
+                uid: user.uid,
+                displayName: name || user.email.split('@')[0],
+                email: user.email,
+                photoURL: null,
+                createdAt: new Date(),
+                isOnline: true,
+            });
+
+            // Trigger welcome notification for new user
+            setUnreadCount(1);
         } catch (error) {
             console.error('Registration Error:', error);
             setError(formatErrorMessage(error.code));

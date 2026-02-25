@@ -13,8 +13,9 @@ import {
     Dimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { auth } from '../config/firebase';
+import { auth, db } from '../config/firebase';
 import { signInWithEmailAndPassword } from 'firebase/auth';
+import { doc, updateDoc } from 'firebase/firestore';
 
 const { width, height } = Dimensions.get('window');
 
@@ -30,7 +31,17 @@ const LoginScreen = ({ navigation }) => {
         setLoading(true);
 
         try {
-            await signInWithEmailAndPassword(auth, email, password);
+            const userCredential = await signInWithEmailAndPassword(auth, email, password);
+            const user = userCredential.user;
+
+            // Ensure user document exists and set status to online
+            await setDoc(doc(db, 'users', user.uid), {
+                uid: user.uid,
+                email: user.email,
+                displayName: user.displayName || user.email.split('@')[0],
+                isOnline: true,
+                lastSeen: new Date()
+            }, { merge: true });
         } catch (error) {
             console.error('Login Error:', error);
             setError('Invalid email or password.');

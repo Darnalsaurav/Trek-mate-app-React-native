@@ -4,34 +4,47 @@ import {
     Text,
     StyleSheet,
     TouchableOpacity,
-    SafeAreaView,
     Linking,
     Platform,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
 
-const MapScreen = ({ navigation }) => {
-    // Everest Base Camp Coordinates
+const MapScreen = ({ route, navigation }) => {
+    const { destination: destinationData } = route.params || {};
+
+    // Coordinates mapping or fallback to Everest
+    const getCoordinates = () => {
+        if (destinationData?.name === 'KHUMAI DADA') return { latitude: 28.3789, longitude: 83.9211 };
+        if (destinationData?.name === 'TILICHO LAKE') return { latitude: 28.6833, longitude: 83.8500 };
+        if (destinationData?.name === 'ANNAPURNA CIRCUIT') return { latitude: 28.5333, longitude: 83.8333 };
+        return {
+            latitude: 28.0072,
+            longitude: 86.8522,
+        };
+    };
+
+    const coords = getCoordinates();
+
     const initialRegion = {
-        latitude: 28.0072,
-        longitude: 86.8522,
+        ...coords,
         latitudeDelta: 0.05,
         longitudeDelta: 0.05,
     };
 
     const handleGetDirections = () => {
-        const destination = "Mount+Everest+Base+Camp";
+        const placeName = destinationData?.name ? destinationData.name.replace(/\s+/g, '+') : "Mount+Everest+Base+Camp";
         const url = Platform.select({
-            ios: `maps:0,0?q=${destination}`,
-            android: `geo:0,0?q=${destination}`,
+            ios: `maps:0,0?q=${placeName}`,
+            android: `geo:0,0?q=${placeName}`,
         });
 
         Linking.canOpenURL(url).then(supported => {
             if (supported) {
                 Linking.openURL(url);
             } else {
-                Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${destination}`);
+                Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${placeName}`);
             }
         });
     };
@@ -44,9 +57,9 @@ const MapScreen = ({ navigation }) => {
                 provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
             >
                 <Marker
-                    coordinate={{ latitude: 28.0072, longitude: 86.8522 }}
-                    title="Everest Base Camp"
-                    description="Solukhumbu, Nepal"
+                    coordinate={coords}
+                    title={destinationData?.name || "Everest Base Camp"}
+                    description={destinationData?.location || "Solukhumbu, Nepal"}
                 />
             </MapView>
 
@@ -62,8 +75,8 @@ const MapScreen = ({ navigation }) => {
             {/* Overlay Info Card */}
             <View style={styles.overlayCard}>
                 <View style={styles.infoTextContainer}>
-                    <Text style={styles.infoTitle}>Everest Base Camp</Text>
-                    <Text style={styles.infoSubtitle}>Solukhumbu, Nepal</Text>
+                    <Text style={styles.infoTitle}>{destinationData?.name || "Everest Base Camp"}</Text>
+                    <Text style={styles.infoSubtitle}>{destinationData?.location || "Solukhumbu, Nepal"}</Text>
                 </View>
                 <TouchableOpacity
                     style={styles.directionBtn}

@@ -8,7 +8,6 @@ import {
     FlatList,
     Dimensions,
     Animated,
-    SafeAreaView,
     StatusBar,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';

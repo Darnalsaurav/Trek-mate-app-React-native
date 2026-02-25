@@ -7,8 +7,8 @@ import {
     Image,
     TouchableOpacity,
     TextInput,
-    SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { getDestinations, subscribeToDestinations } from '../utils/destinationStore';
@@ -34,7 +34,7 @@ const ExploreScreen = ({ navigation }) => {
             </View>
 
             {/* Search Bar - Matching Home */}
-          
+
             {/* Destination Cards */}
             <ScrollView style={styles.content} contentContainerStyle={{ paddingBottom: 120 }}>
                 <View style={styles.cardsContainer}>
@@ -43,6 +43,7 @@ const ExploreScreen = ({ navigation }) => {
                             key={destination.id}
                             style={styles.card}
                             activeOpacity={0.9}
+                            onPress={() => navigation.navigate('DestinationDetail', { destination })}
                         >
                             <Image
                                 source={{ uri: destination.image }}

@@ -6,8 +6,8 @@ import {
     Image,
     ScrollView,
     TouchableOpacity,
-    SafeAreaView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -24,16 +24,9 @@ const DestinationDetail = ({ route, navigation }) => {
     const currentDestination = destination || defaultDestination;
 
     const trekStats = [
-        { label: 'Distance', value: '10km' },
-        { label: 'Duration', value: '12hrs' },
-        { label: 'Elevation', value: '5360m' }
-    ];
-
-    const galleryImages = [
-        currentDestination.image,
-        'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=400&q=80',
-        'https://images.unsplash.com/photo-1486870591958-9b9d0d1dda99?w=400&q=80',
-        'https://images.unsplash.com/photo-1544735716-392fe2489ffa?w=400&q=80'
+        { label: 'Distance', value: currentDestination.distance || '10km' },
+        { label: 'Duration', value: currentDestination.duration || '12hrs' },
+        { label: 'Elevation', value: currentDestination.elevation || '5360m' }
     ];
 
     return (
@@ -90,20 +83,34 @@ const DestinationDetail = ({ route, navigation }) => {
                         {currentDestination.description || defaultDestination.description}
                     </Text>
 
-                    {/* Gallery */}
-                    <Text style={styles.sectionTitle}>Gallery</Text>
-                    <ScrollView
-                        horizontal={true}
-                        contentContainerStyle={styles.galleryContainer}
-                    >
-                        {galleryImages.map((img, index) => (
-                            <Image
-                                key={index}
-                                source={{ uri: img }}
-                                style={styles.galleryItem}
-                            />
-                        ))}
-                    </ScrollView>
+                    {/* Action Buttons: Map & Weather */}
+                    <View style={styles.actionRow}>
+                        <TouchableOpacity
+                            style={styles.actionBtn}
+                            onPress={() => navigation.navigate('Map', { destination: currentDestination })}
+                        >
+                            <LinearGradient
+                                colors={['#1C3D3E', '#2D5A5C']}
+                                style={styles.actionGradient}
+                            >
+                                <Ionicons name="map-outline" size={24} color="white" />
+                                <Text style={styles.actionBtnText}>View Map</Text>
+                            </LinearGradient>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                            style={styles.actionBtn}
+                            onPress={() => navigation.navigate('Weather', { destination: currentDestination })}
+                        >
+                            <LinearGradient
+                                colors={['#1C3D3E', '#2D5A5C']}
+                                style={styles.actionGradient}
+                            >
+                                <Ionicons name="cloud-outline" size={24} color="white" />
+                                <Text style={styles.actionBtnText}>Weather</Text>
+                            </LinearGradient>
+                        </TouchableOpacity>
+                    </View>
 
                     {/* Join Button */}
                     <TouchableOpacity style={styles.joinBtn}>
@@ -230,15 +237,27 @@ const styles = StyleSheet.create({
         color: '#4b5563',
         marginBottom: 24,
     },
-    galleryContainer: {
-        paddingBottom: 24,
+    actionRow: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        marginBottom: 24,
+        gap: 12,
     },
-    galleryItem: {
-        width: 120,
-        height: 120,
-        borderRadius: 16,
-        marginRight: 12,
-        resizeMode: 'cover',
+    actionBtn: {
+        flex: 1,
+    },
+    actionGradient: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 15,
+        borderRadius: 15,
+        gap: 8,
+    },
+    actionBtnText: {
+        color: 'white',
+        fontSize: 14,
+        fontFamily: 'Syne-Bold',
     },
     joinBtn: {
         backgroundColor: '#1C3D3E',
@@ -249,7 +268,6 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 4 },
         shadowRadius: 8,
         elevation: 8,
-        marginTop: 10,
     },
     joinBtnText: {
         color: 'white',
