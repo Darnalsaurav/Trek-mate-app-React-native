@@ -64,6 +64,18 @@ const DestinationDetail = ({ route, navigation }) => {
                     </View>
                     <Text style={styles.destinationLocation}>{currentDestination.location}</Text>
 
+                    {/* Trip Dates */}
+                    {(currentDestination.startDate || currentDestination.endDate) && (
+                        <View style={styles.datesContainer}>
+                            <View style={styles.dateItem}>
+                                <Ionicons name="calendar-outline" size={16} color="#1C3D3E" />
+                                <Text style={styles.dateText}>
+                                    {currentDestination.startDate || 'TBD'} - {currentDestination.endDate || 'TBD'}
+                                </Text>
+                            </View>
+                        </View>
+                    )}
+
                     {/* Stats Bar */}
                     <View style={styles.statsBar}>
                         {trekStats.map((stat, index) => (
@@ -273,6 +285,26 @@ const styles = StyleSheet.create({
         color: 'white',
         fontSize: 18,
         fontFamily: 'Syne-Bold',
+    },
+    datesContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginLeft: 28,
+        marginBottom: 20,
+    },
+    dateItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#F3F4F6',
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 20,
+        gap: 6,
+    },
+    dateText: {
+        fontSize: 13,
+        fontFamily: 'Syne-Bold',
+        color: '#1C3D3E',
     },
 });
 

@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+import MapView, { Marker, PROVIDER_GOOGLE, UrlTile } from 'react-native-maps';
 
 const MapScreen = ({ route, navigation }) => {
     const { destination: destinationData } = route.params || {};
@@ -54,8 +54,16 @@ const MapScreen = ({ route, navigation }) => {
             <MapView
                 style={styles.map}
                 initialRegion={initialRegion}
-                provider={Platform.OS === 'android' ? PROVIDER_GOOGLE : undefined}
+                provider={PROVIDER_GOOGLE}
+                mapType={Platform.OS === 'android' ? "none" : "standard"}
             >
+                {/* Open Street Map Tiles */}
+                <UrlTile
+                    urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
+                    maximumZ={19}
+                    flipY={false}
+                />
+
                 <Marker
                     coordinate={coords}
                     title={destinationData?.name || "Everest Base Camp"}

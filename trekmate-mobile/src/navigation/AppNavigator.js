@@ -23,6 +23,7 @@ import MapScreen from '../components/MapScreen';
 import FloatingNavbar from '../components/FloatingNavbar';
 import NotificationsScreen from '../components/NotificationsScreen';
 import WeatherScreen from '../components/WeatherScreen';
+import MyTripsScreen from '../components/MyTripsScreen';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -101,6 +102,7 @@ export default function AppNavigator() {
                         <Stack.Screen name="Map" component={MapScreen} />
                         <Stack.Screen name="Notifications" component={NotificationsScreen} />
                         <Stack.Screen name="Weather" component={WeatherScreen} />
+                        <Stack.Screen name="MyTrips" component={MyTripsScreen} />
                     </Stack.Group>
                 ) : (
                     // Unauthenticated Stack

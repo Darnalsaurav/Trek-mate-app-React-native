@@ -8,7 +8,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const ProfileScreen = () => {
+const ProfileScreen = ({ navigation }) => {
     const user = auth.currentUser;
     const [uploading, setUploading] = useState(false);
     const [profileImage, setProfileImage] = useState(user?.photoURL);
@@ -169,7 +169,10 @@ const ProfileScreen = () => {
                 <View style={styles.menuSection}>
                     <Text style={styles.menuHeader}>Account Settings</Text>
 
-                    <TouchableOpacity style={styles.menuItem}>
+                    <TouchableOpacity
+                        style={styles.menuItem}
+                        onPress={() => navigation.navigate('MyTrips')}
+                    >
                         <View style={[styles.menuIconContainer, { backgroundColor: '#F1F8E8' }]}>
                             <Ionicons name="map-outline" size={22} color="#1C3D3E" />
                         </View>

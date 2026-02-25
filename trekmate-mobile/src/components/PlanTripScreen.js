@@ -12,11 +12,12 @@ import {
     Alert,
     Keyboard,
     TouchableWithoutFeedback,
+    ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
-import { addDestination, addPlannedTrip } from '../utils/destinationStore';
+import { planNewTrek } from '../utils/destinationStore';
 
 const PlanTripScreen = ({ navigation }) => {
     const [destination, setDestination] = useState('');
@@ -24,6 +25,7 @@ const PlanTripScreen = ({ navigation }) => {
     const [startDate, setStartDate] = useState('');
     const [endDate, setEndDate] = useState('');
     const [image, setImage] = useState(null);
+    const [submitting, setSubmitting] = useState(false);
 
     const pickImage = async () => {
         const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -33,7 +35,7 @@ const PlanTripScreen = ({ navigation }) => {
         }
 
         const result = await ImagePicker.launchImageLibraryAsync({
-            mediaTypes: ImagePicker.MediaTypeOptions.Images,
+            mediaTypes: ['images'],
             allowsEditing: true,
             aspect: [16, 9],
             quality: 0.8,
@@ -46,28 +48,39 @@ const PlanTripScreen = ({ navigation }) => {
 
     const isFormValid = destination.trim() !== '' && district.trim() !== '' && startDate.trim() !== '' && endDate.trim() !== '';
 
-    const handleConfirmTrip = () => {
+    const handleConfirmTrip = async () => {
         if (!isFormValid) {
             Alert.alert('Missing Fields', 'Please fill in the destination and dates to plan your trek.');
             return;
         }
 
+        setSubmitting(true);
         const tripData = {
             name: destination,
             location: district.trim() ? `${district.trim()} District` : 'Nepal',
-            image: image || 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1200&q=80',
+            image: image || null,
             startDate: startDate.trim(),
             endDate: endDate.trim(),
         };
 
-        // Add to Explore destinations
-        addDestination(tripData);
-        // Add to Upcoming Treks on Home
-        addPlannedTrip(tripData);
+        try {
+            await planNewTrek(tripData);
 
-        Alert.alert('Trip Confirmed! 🎉', `Your trek to ${destination} has been planned.`, [
-            { text: 'OK', onPress: () => navigation.navigate('ExploreTab') }
-        ]);
+            // Reset form
+            setDestination('');
+            setDistrict('');
+            setStartDate('');
+            setEndDate('');
+            setImage(null);
+
+            Alert.alert('Trip Confirmed! 🎉', `Your trek to ${destination} has been planned and shared with the community.`, [
+                { text: 'OK', onPress: () => navigation.navigate('ExploreTab') }
+            ]);
+        } catch (error) {
+            Alert.alert('Error', 'Failed to save your trip. Please try again.');
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     return (
@@ -176,12 +189,16 @@ const PlanTripScreen = ({ navigation }) => {
 
                                 {/* Submit Button */}
                                 <TouchableOpacity
-                                    style={[styles.confirmButton, !isFormValid && styles.confirmButtonDisabled]}
+                                    style={[styles.confirmButton, (!isFormValid || submitting) && styles.confirmButtonDisabled]}
                                     onPress={handleConfirmTrip}
                                     activeOpacity={0.8}
-                                    disabled={!isFormValid}
+                                    disabled={!isFormValid || submitting}
                                 >
-                                    <Text style={styles.confirmButtonText}>Confirm My Trip</Text>
+                                    {submitting ? (
+                                        <ActivityIndicator color="#fff" />
+                                    ) : (
+                                        <Text style={styles.confirmButtonText}>Confirm My Trip</Text>
+                                    )}
                                 </TouchableOpacity>
                             </View>
                         </TouchableWithoutFeedback>

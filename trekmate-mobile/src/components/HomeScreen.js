@@ -104,39 +104,6 @@ const HomeScreen = ({ navigation }) => {
         }
     ];
 
-    const upcomingTreks = [
-        {
-            id: 4,
-            name: 'LANGTANG VALLEY',
-            location: 'Rasuwa District',
-            image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80',
-            description: 'Known as the valley of glaciers, Langtang offers a rich cultural experience with its Tamang heritage and spectacular mountain scenery. It is one of the most accessible trekking regions from Kathmandu.',
-            distance: '18km',
-            duration: '16hrs',
-            elevation: '3870m'
-        },
-        {
-            id: 5,
-            name: 'ANNAPURNA BASE CAMP',
-            location: 'Pokhara District',
-            image: 'https://images.unsplash.com/photo-1518548419970-58e3b4079ab2?w=800&q=80',
-            description: 'ABC Trek is one of the most popular treks in Nepal. It leads you into a natural amphitheater of towering peaks including Annapurna I, the world\'s tenth highest mountain.',
-            distance: '22km',
-            duration: '20hrs',
-            elevation: '4130m'
-        },
-        {
-            id: 6,
-            name: 'MANASLU CIRCUIT',
-            location: 'Gorkha District',
-            image: 'https://images.unsplash.com/photo-1486870591958-9b9d0d1dda99?w=800&q=80',
-            description: 'The Manaslu Circuit is a restricted area trek that skirts the world\'s eighth highest mountain. It offers raw mountain beauty and a deep dive into the Tibetan-style culture of the Upper Gorkha region.',
-            distance: '25km',
-            duration: '24hrs',
-            elevation: '5106m'
-        }
-    ];
-
     const DestinationCard = ({ destination }) => (
         <TouchableOpacity
             style={styles.card}
@@ -233,8 +200,7 @@ const HomeScreen = ({ navigation }) => {
                         {plannedTrips.length === 0 ? (
                             <View style={styles.emptyUpcoming}>
                                 <Ionicons name="calendar-outline" size={36} color="#ccc" />
-                                <Text style={styles.emptyUpcomingText}>No upcoming treks yet.{'
-'}Plan one to see it here!</Text>
+                                <Text style={styles.emptyUpcomingText}>No upcoming treks yet.{"\n"}Plan one to see it here!</Text>
                             </View>
                         ) : (
                             <ScrollView
