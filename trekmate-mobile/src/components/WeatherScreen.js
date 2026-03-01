@@ -65,45 +65,90 @@ const WeatherScreen = ({ route, navigation }) => {
     const insets = useSafeAreaInsets();
 
     useEffect(() => {
+        let isMounted = true;
         const load = async () => {
             setLoading(true);
-
-            const districtName = (destination?.location || 'Kathmandu')
-                .replace(/\s*District\s*/i, '')
-                .trim();
-
-            const usedCity = districtName || 'Kathmandu';
-            console.log(`[Weather] Fetching for district: "${usedCity}"`);
-
+            setCurrent(null);
+            setForecast([]);
             let loadedFromAPI = false;
 
             try {
-                const res = await fetch(
-                    `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(usedCity)}&appid=${API_KEY}&units=metric`,
-                    { signal: AbortSignal.timeout(6000) }   // 6s timeout
-                );
-                const data = await res.json();
-                console.log(`[Weather] API cod: ${data.cod}, message: ${data.message || 'ok'}`);
+                const districtName = (destination?.location || 'Kathmandu')
+                    .replace(/\s*District\s*/i, '')
+                    .trim();
 
-                if (Number(data.cod) === 200) {
+                const usedCity = districtName || 'Kathmandu';
+                const trekName = (destination?.name || '').trim();
+
+                console.log(`[Weather] Fetching for: "${trekName}" in "${usedCity}"`);
+
+                const cleanSearch = (name) => {
+                    return name.replace(/\s*(Base Camp|BC|Trek|Circuit|Valley|Lake|Himal|Peak|Mount|Mt)\s*/gi, ' ').trim();
+                };
+
+                const searchStrategies = [
+                    trekName,
+                    `${trekName},NP`,
+                    cleanSearch(trekName),
+                    usedCity,
+                    `${usedCity},NP`
+                ].filter(s => s && s.length > 2);
+
+                const uniqueStrategies = [...new Set(searchStrategies)];
+                let finalData = null;
+
+                // Search Strategy Loop
+                for (const strategy of uniqueStrategies) {
+                    try {
+                        const geoUrl = `https://api.openweathermap.org/geo/1.0/direct?q=${encodeURIComponent(strategy)}&limit=1&appid=${API_KEY}`;
+                        const geoRes = await fetch(geoUrl);
+                        const geoData = await geoRes.json();
+
+                        if (geoData && geoData.length > 0) {
+                            const { lat, lon } = geoData[0];
+                            const weatherUrl = `https://api.openweathermap.org/data/2.5/weather?lat=${lat}&lon=${lon}&appid=${API_KEY}&units=metric&_cb=${Date.now()}`;
+                            const weatherRes = await fetch(weatherUrl);
+                            const data = await weatherRes.json();
+                            if (data && Number(data.cod) === 200) {
+                                finalData = data;
+                                break;
+                            }
+                        }
+                    } catch (e) {
+                        console.log(`[Weather] Strategy "${strategy}" failed:`, e.message);
+                    }
+                }
+
+                // Direct Search Fallback
+                if (!finalData) {
+                    try {
+                        const res = await fetch(`https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(usedCity + ',NP')}&appid=${API_KEY}&units=metric&_cb=${Date.now()}`);
+                        const data = await res.json();
+                        if (data && Number(data.cod) === 200) finalData = data;
+                    } catch (e) { }
+                }
+
+                if (isMounted && finalData && Number(finalData.cod) === 200) {
                     setCurrent({
-                        temp: Math.round(data.main.temp),
-                        feelsLike: Math.round(data.main.feels_like),
-                        condition: data.weather[0].main,
-                        description: data.weather[0].description.replace(/\b\w/g, c => c.toUpperCase()),
-                        wind: Math.round(data.wind.speed * 3.6),
-                        humidity: data.main.humidity,
-                        icon: owmIconToIonicon(data.weather[0].icon),
-                        city: data.name,
+                        temp: Math.round(finalData.main.temp),
+                        feelsLike: Math.round(finalData.main.feels_like),
+                        condition: finalData.weather[0].main,
+                        description: finalData.weather[0].description.replace(/\b\w/g, c => c.toUpperCase()),
+                        wind: Math.round(finalData.wind.speed * 3.6),
+                        humidity: finalData.main.humidity,
+                        icon: owmIconToIonicon(finalData.weather[0].icon),
+                        city: finalData.name,
                     });
                     loadedFromAPI = true;
                     setIsLive(true);
 
                     // Forecast
+                    const fController = new AbortController();
+                    const fTimeoutId = setTimeout(() => fController.abort(), 8000);
                     try {
                         const fRes = await fetch(
-                            `https://api.openweathermap.org/data/2.5/forecast?q=${encodeURIComponent(data.name)}&appid=${API_KEY}&units=metric`,
-                            { signal: AbortSignal.timeout(6000) }
+                            `https://api.openweathermap.org/data/2.5/forecast?lat=${finalData.coord.lat}&lon=${finalData.coord.lon}&appid=${API_KEY}&units=metric`,
+                            { signal: fController.signal }
                         );
                         const fData = await fRes.json();
                         if (String(fData.cod) === '200') {
@@ -117,26 +162,27 @@ const WeatherScreen = ({ route, navigation }) => {
                                 }));
                             setForecast(daily);
                         }
-                    } catch (_) { }
-                } else {
-                    console.warn(`[Weather] API key not yet active (cod: ${data.cod}). Using local data.`);
+                    } catch (_) { } finally {
+                        clearTimeout(fTimeoutId);
+                    }
                 }
-            } catch (e) {
-                console.warn(`[Weather] Network error: ${e.message}. Using local data.`);
-            }
 
-            // Use static fallback if API failed
-            if (!loadedFromAPI) {
-                const fallback = DISTRICT_FALLBACK[usedCity] || DISTRICT_FALLBACK['Kathmandu'];
-                setCurrent({ ...fallback, city: usedCity });
-                setForecast(getFallbackForecast(fallback));
-                setIsLive(false);
+                // Use static fallback if API failed or returned nothing
+                if (isMounted && !loadedFromAPI) {
+                    const fallback = DISTRICT_FALLBACK[usedCity] || DISTRICT_FALLBACK['Kathmandu'];
+                    setCurrent({ ...fallback, city: usedCity });
+                    setForecast(getFallbackForecast(fallback));
+                    setIsLive(false);
+                }
+            } catch (error) {
+                console.error('[Weather] Fatal load error:', error);
+            } finally {
+                if (isMounted) setLoading(false);
             }
-
-            setLoading(false);
         };
 
         load();
+        return () => { isMounted = false; };
     }, [destination]);
 
     // ─── Loading ─────────────────────────────────────────────────────────────

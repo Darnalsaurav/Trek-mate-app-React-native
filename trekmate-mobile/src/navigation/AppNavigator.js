@@ -96,13 +96,25 @@ export default function AppNavigator() {
                 {user ? (
                     // Authenticated Stack
                     <Stack.Group>
-                        <Stack.Screen name="MainTabs" component={MainTabs} />
-                        <Stack.Screen name="DestinationDetail" component={DestinationDetail} />
+                        <Stack.Screen
+                            name="MainTabs"
+                            component={MainTabs}
+                            options={{ gestureEnabled: false }}
+                        />
+                        <Stack.Screen
+                            name="DestinationDetail"
+                            component={DestinationDetail}
+                            options={{ gestureEnabled: false }}
+                        />
                         <Stack.Screen name="Chat" component={ChatScreen} />
                         <Stack.Screen name="Map" component={MapScreen} />
                         <Stack.Screen name="Notifications" component={NotificationsScreen} />
                         <Stack.Screen name="Weather" component={WeatherScreen} />
-                        <Stack.Screen name="MyTrips" component={MyTripsScreen} />
+                        <Stack.Screen
+                            name="MyTrips"
+                            component={MyTripsScreen}
+                            options={{ gestureEnabled: false }}
+                        />
                     </Stack.Group>
                 ) : (
                     // Unauthenticated Stack

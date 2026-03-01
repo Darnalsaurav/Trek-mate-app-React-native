@@ -46,9 +46,9 @@ const MyTripsScreen = ({ navigation }) => {
                     <Text style={styles.emptyText}>You haven't planned any trips yet.</Text>
                     <TouchableOpacity
                         style={styles.planBtn}
-                        onPress={() => navigation.navigate('Plan')}
+                        onPress={() => navigation.navigate('MainTabs', { screen: 'PlanTrip' })}
                     >
-                        <Text style={styles.planBtnText}>Plan Now</Text>
+                        <Text style={styles.planBtnText}>Plan Your Trek</Text>
                     </TouchableOpacity>
                 </View>
             ) : (
@@ -73,6 +73,7 @@ const MyTripsScreen = ({ navigation }) => {
                                     <View style={styles.titleRow}>
                                         <Text style={styles.cardName}>{trip.name}</Text>
                                         <View style={styles.dateBadge}>
+                                            <Ionicons name="calendar-outline" size={12} color="white" />
                                             <Text style={styles.dateText}>{trip.startDate}</Text>
                                         </View>
                                     </View>

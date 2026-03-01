@@ -13,12 +13,34 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
-import { auth } from '../config/firebase';
+import { auth, db } from '../config/firebase';
+import { onSnapshot, doc } from 'firebase/firestore';
 import { getUnreadCount, subscribeToNotifications, setUnreadCount } from '../utils/notificationStore';
 import { getPlannedTrips, subscribeToPlannedTrips } from '../utils/destinationStore';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
+
+const DestinationCard = ({ destination, navigation }) => (
+    <TouchableOpacity
+        style={styles.card}
+        activeOpacity={0.9}
+        onPress={() => navigation.navigate('DestinationDetail', { destination })}
+    >
+        <Image
+            source={{ uri: destination.image }}
+            style={styles.cardImage}
+        />
+        <View style={styles.cardOverlay}>
+            <View style={styles.cardInfoPill}>
+                <View style={styles.cardTextContent}>
+                    <Text style={styles.cardTitle} numberOfLines={1}>{destination.name}</Text>
+                    <Text style={styles.cardLocation} numberOfLines={1}>{destination.location}</Text>
+                </View>
+            </View>
+        </View>
+    </TouchableOpacity>
+);
 
 const HomeScreen = ({ navigation }) => {
     const [userName, setUserName] = useState(
@@ -29,6 +51,7 @@ const HomeScreen = ({ navigation }) => {
     const [profileImage, setProfileImage] = useState(auth.currentUser?.photoURL);
     const [unreadCount, setUnreadCountState] = useState(getUnreadCount());
     const [plannedTrips, setPlannedTrips] = useState(getPlannedTrips());
+    const [searchQuery, setSearchQuery] = useState('');
 
     useEffect(() => {
         const unsubscribe = subscribeToNotifications((count) => {
@@ -59,17 +82,24 @@ const HomeScreen = ({ navigation }) => {
         checkFirstTime();
     }, []);
 
+
     useEffect(() => {
         const user = auth.currentUser;
-        if (user) {
-            // Force a reload to catch the displayName or photoURL if it was just set
-            user.reload().then(() => {
-                const updatedUser = auth.currentUser;
-                setUserName(updatedUser?.displayName || updatedUser?.email?.split('@')[0] || 'User');
-                setProfileImage(updatedUser?.photoURL);
-            }).catch(err => console.log('Error reloading user:', err));
-        }
-    }, [navigation]); // Reload when navigating (e.g., coming back from Profile)
+        if (!user) return;
+
+        // Listen for real-time changes to the user's profile in Firestore
+        const unsubscribe = onSnapshot(doc(db, 'users', user.uid), (snapshot) => {
+            if (snapshot.exists()) {
+                const userData = snapshot.data();
+                setUserName(userData.displayName || user.displayName || user.email?.split('@')[0] || 'User');
+                setProfileImage(userData.photoURL || user.photoURL);
+            }
+        }, (error) => {
+            console.log('Error listening to user profile:', error);
+        });
+
+        return unsubscribe;
+    }, []);
 
     const recommendedDestinations = [
         {
@@ -104,24 +134,17 @@ const HomeScreen = ({ navigation }) => {
         }
     ];
 
-    const DestinationCard = ({ destination }) => (
-        <TouchableOpacity
-            style={styles.card}
-            activeOpacity={0.9}
-            onPress={() => navigation.navigate('DestinationDetail', { destination })}
-        >
-            <Image
-                source={{ uri: destination.image }}
-                style={styles.cardImage}
-            />
-            <View style={styles.cardOverlay}>
-                <View style={styles.cardInfoPill}>
-                    <Text style={styles.cardTitle}>{destination.name}</Text>
-                    <Text style={styles.cardLocation}>{destination.location}</Text>
-                </View>
-            </View>
-        </TouchableOpacity>
+    const filteredRecommended = recommendedDestinations.filter(dest =>
+        dest.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        dest.location.toLowerCase().includes(searchQuery.toLowerCase())
     );
+
+    const filteredPlanned = plannedTrips.filter(trek =>
+        trek.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        trek.location.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+
+    const noResults = searchQuery.length > 0 && filteredRecommended.length === 0 && filteredPlanned.length === 0;
 
     return (
         <View style={styles.container}>
@@ -169,51 +192,72 @@ const HomeScreen = ({ navigation }) => {
                                 style={styles.searchInput}
                                 placeholder="Search the destination"
                                 placeholderTextColor="#999"
+                                value={searchQuery}
+                                onChangeText={setSearchQuery}
                             />
+                            {searchQuery.length > 0 && (
+                                <TouchableOpacity onPress={() => setSearchQuery('')}>
+                                    <Ionicons name="close-circle" size={20} color="#999" />
+                                </TouchableOpacity>
+                            )}
                         </View>
                     </View>
 
-                    {/* Recommended Section */}
-                    <View style={styles.section}>
-                        <View style={styles.sectionHeader}>
-                            <Text style={styles.sectionTitle}>Recommended for you</Text>
-                            <TouchableOpacity>
-                                <Text style={styles.seeAll}>See All</Text>
-                            </TouchableOpacity>
+                    {noResults ? (
+                        <View style={styles.noResultsContainer}>
+                            <Ionicons name="search-outline" size={60} color="#ccc" />
+                            <Text style={styles.noResultsText}>Trek not available</Text>
+                            <Text style={styles.noResultsSubtext}>Try searching for something else</Text>
                         </View>
-                        <ScrollView
-                            horizontal
-                            showsHorizontalScrollIndicator={false}
-                            contentContainerStyle={styles.cardList}
-                        >
-                            {recommendedDestinations.map((dest) => (
-                                <DestinationCard key={dest.id} destination={dest} />
-                            ))}
-                        </ScrollView>
-                    </View>
+                    ) : (
+                        <>
+                            {/* Recommended Section */}
+                            {filteredRecommended.length > 0 && (
+                                <View style={styles.section}>
+                                    <View style={styles.sectionHeader}>
+                                        <Text style={styles.sectionTitle}>Recommended for you</Text>
+                                        <TouchableOpacity>
+                                            <Text style={styles.seeAll}>See All</Text>
+                                        </TouchableOpacity>
+                                    </View>
+                                    <ScrollView
+                                        horizontal
+                                        showsHorizontalScrollIndicator={false}
+                                        contentContainerStyle={styles.cardList}
+                                    >
+                                        {filteredRecommended.map((dest) => (
+                                            <DestinationCard key={dest.id} destination={dest} navigation={navigation} />
+                                        ))}
+                                    </ScrollView>
+                                </View>
+                            )}
 
-                    {/* Upcoming Treks Section */}
-                    <View style={styles.section}>
-                        <View style={styles.sectionHeader}>
-                            <Text style={styles.sectionTitle}>Upcoming treks</Text>
-                        </View>
-                        {plannedTrips.length === 0 ? (
-                            <View style={styles.emptyUpcoming}>
-                                <Ionicons name="calendar-outline" size={36} color="#ccc" />
-                                <Text style={styles.emptyUpcomingText}>No upcoming treks yet.{"\n"}Plan one to see it here!</Text>
-                            </View>
-                        ) : (
-                            <ScrollView
-                                horizontal
-                                showsHorizontalScrollIndicator={false}
-                                contentContainerStyle={styles.cardList}
-                            >
-                                {plannedTrips.map((trek) => (
-                                    <DestinationCard key={trek.id} destination={trek} />
-                                ))}
-                            </ScrollView>
-                        )}
-                    </View>
+                            {/* Upcoming Treks Section */}
+                            {(filteredPlanned.length > 0 || (searchQuery === '' && plannedTrips.length === 0)) && (
+                                <View style={styles.section}>
+                                    <View style={styles.sectionHeader}>
+                                        <Text style={styles.sectionTitle}>Upcoming treks</Text>
+                                    </View>
+                                    {plannedTrips.length === 0 ? (
+                                        <View style={styles.emptyUpcoming}>
+                                            <Ionicons name="calendar-outline" size={36} color="#ccc" />
+                                            <Text style={styles.emptyUpcomingText}>No upcoming treks yet.{"\n"}Plan one to see it here!</Text>
+                                        </View>
+                                    ) : filteredPlanned.length > 0 ? (
+                                        <ScrollView
+                                            horizontal
+                                            showsHorizontalScrollIndicator={false}
+                                            contentContainerStyle={styles.cardList}
+                                        >
+                                            {filteredPlanned.map((trek) => (
+                                                <DestinationCard key={trek.id} destination={trek} navigation={navigation} />
+                                            ))}
+                                        </ScrollView>
+                                    ) : null}
+                                </View>
+                            )}
+                        </>
+                    )}
 
                     {/* Padding for Floating Nav */}
                     <View style={{ height: 120 }} />
@@ -350,12 +394,18 @@ const styles = StyleSheet.create({
         paddingHorizontal: 10,
     },
     cardInfoPill: {
-        backgroundColor: 'rgba(255, 255, 255, 0.85)',
-        borderRadius: 15,
-        paddingVertical: 8,
+        backgroundColor: 'rgba(255, 255, 255, 0.9)',
+        borderRadius: 20,
+        paddingVertical: 10,
         paddingHorizontal: 12,
         width: '100%',
+        flexDirection: 'row',
         alignItems: 'center',
+        justifyContent: 'space-between',
+        gap: 8,
+    },
+    cardTextContent: {
+        flex: 1,
     },
     cardTitle: {
         fontSize: 12,
@@ -387,6 +437,41 @@ const styles = StyleSheet.create({
         fontSize: 10,
         fontFamily: 'Syne-Bold',
         lineHeight: 12,
+    },
+    emptyUpcoming: {
+        alignItems: 'center',
+        paddingVertical: 20,
+        backgroundColor: '#f9f9f9',
+        marginHorizontal: 25,
+        borderRadius: 20,
+        borderWidth: 1,
+        borderColor: '#eee',
+        borderStyle: 'dashed',
+    },
+    emptyUpcomingText: {
+        fontSize: 13,
+        fontFamily: 'Syne-Regular',
+        color: '#999',
+        textAlign: 'center',
+        marginTop: 8,
+        lineHeight: 18,
+    },
+    noResultsContainer: {
+        alignItems: 'center',
+        paddingVertical: 50,
+        paddingHorizontal: 20,
+    },
+    noResultsText: {
+        fontSize: 18,
+        fontFamily: 'Syne-Bold',
+        color: '#1C3D3E',
+        marginTop: 15,
+    },
+    noResultsSubtext: {
+        fontSize: 14,
+        fontFamily: 'Syne-Regular',
+        color: '#999',
+        marginTop: 5,
     },
 });
 

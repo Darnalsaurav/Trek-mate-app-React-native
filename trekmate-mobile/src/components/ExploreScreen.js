@@ -54,8 +54,10 @@ const ExploreScreen = ({ navigation }) => {
                                 style={styles.cardGradient}
                             />
                             <View style={styles.cardLabel}>
-                                <Text style={styles.cardName}>{destination.name}</Text>
-                                <Text style={styles.cardLocation}>{destination.location}</Text>
+                                <View style={{ flex: 1 }}>
+                                    <Text style={styles.cardName}>{destination.name}</Text>
+                                    <Text style={styles.cardLocation}>{destination.location}</Text>
+                                </View>
                             </View>
                         </TouchableOpacity>
                     ))}
@@ -141,6 +143,12 @@ const styles = StyleSheet.create({
         bottom: 20,
         left: 20,
         right: 20,
+    },
+    cardHeaderRow: {
+        flexDirection: 'row',
+        alignItems: 'flex-end',
+        justifyContent: 'space-between',
+        gap: 15,
     },
     cardName: {
         fontSize: 18,

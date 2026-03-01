@@ -64,8 +64,9 @@ const DestinationDetail = ({ route, navigation }) => {
                     </View>
                     <Text style={styles.destinationLocation}>{currentDestination.location}</Text>
 
+
                     {/* Trip Dates */}
-                    {(currentDestination.startDate || currentDestination.endDate) && (
+                    {!!(currentDestination.startDate || currentDestination.endDate) && (
                         <View style={styles.datesContainer}>
                             <View style={styles.dateItem}>
                                 <Ionicons name="calendar-outline" size={16} color="#1C3D3E" />
@@ -206,7 +207,7 @@ const styles = StyleSheet.create({
         fontFamily: 'Syne-Regular',
         color: '#6b7280',
         marginLeft: 28,
-        marginBottom: 24,
+        marginBottom: 15,
     },
     statsBar: {
         flexDirection: 'row',

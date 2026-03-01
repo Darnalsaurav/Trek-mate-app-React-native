@@ -1,20 +1,41 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, ActivityIndicator, Alert, TextInput } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import {
+    View,
+    Text,
+    StyleSheet,
+    ScrollView,
+    TouchableOpacity,
+    Image,
+    ActivityIndicator,
+    Alert,
+    TextInput,
+    Platform,
+} from 'react-native';
+import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { auth, storage, db } from '../config/firebase';
 import { signOut, updateProfile } from 'firebase/auth';
-import { doc, updateDoc } from 'firebase/firestore';
+import { doc, updateDoc, setDoc } from 'firebase/firestore';
 import * as ImagePicker from 'expo-image-picker';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { subscribeToMyTrips } from '../utils/destinationStore';
 
 const ProfileScreen = ({ navigation }) => {
     const user = auth.currentUser;
     const [uploading, setUploading] = useState(false);
-    const [profileImage, setProfileImage] = useState(user?.photoURL);
-    const [bio, setBio] = useState('Passionate about peaks and peace. 🏔️');
+    const [profileImage, setProfileImage] = useState(user?.photoURL || null);
+    const [bio, setBio] = useState('Happy Trekking! 🏔️');
     const [isEditingBio, setIsEditingBio] = useState(false);
     const [tempBio, setTempBio] = useState('');
+    const [myTrips, setMyTrips] = useState([]);
+
+    useEffect(() => {
+        const unsubscribe = subscribeToMyTrips((data) => {
+            setMyTrips(data);
+        });
+        return unsubscribe;
+    }, []);
 
     React.useEffect(() => {
         loadBio();
@@ -22,7 +43,7 @@ const ProfileScreen = ({ navigation }) => {
 
     const loadBio = async () => {
         try {
-            const savedBio = await AsyncStorage.getItem(`bio_${user.uid}`);
+            const savedBio = await AsyncStorage.getItem(`bio_${user.uid} `);
             if (savedBio) setBio(savedBio);
         } catch (error) {
             console.log('Error loading bio:', error);
@@ -31,7 +52,7 @@ const ProfileScreen = ({ navigation }) => {
 
     const handleSaveBio = async () => {
         try {
-            await AsyncStorage.setItem(`bio_${user.uid}`, tempBio);
+            await AsyncStorage.setItem(`bio_${user.uid} `, tempBio);
             setBio(tempBio);
             setIsEditingBio(false);
         } catch (error) {
@@ -48,10 +69,11 @@ const ProfileScreen = ({ navigation }) => {
         try {
             // Mark user as offline before signing out
             if (user) {
-                await updateDoc(doc(db, 'users', user.uid), {
+                // Use setDoc with merge: true instead of updateDoc to ensure it doesn't fail if document is missing
+                await setDoc(doc(db, 'users', user.uid), {
                     isOnline: false,
                     lastSeen: new Date()
-                });
+                }, { merge: true });
             }
             await signOut(auth);
         } catch (error) {
@@ -75,23 +97,57 @@ const ProfileScreen = ({ navigation }) => {
 
     const uploadImage = async (uri) => {
         setUploading(true);
+        console.log('[Cloudinary] Starting upload for:', uri);
+
         try {
-            const response = await fetch(uri);
-            const blob = await response.blob();
-            const storageRef = ref(storage, `profiles/${user.uid}`);
+            // 1. Prepare FormData
+            const data = new FormData();
 
-            await uploadBytes(storageRef, blob);
-            const downloadURL = await getDownloadURL(storageRef);
+            // Extract extension for a cleaner filename
+            const ext = uri.split('.').pop();
+            const filename = `photo.${ext}`;
 
-            await updateProfile(user, {
-                photoURL: downloadURL
+            data.append('file', {
+                uri,
+                type: `image/${ext === 'png' ? 'png' : 'jpeg'}`,
+                name: filename,
+            });
+
+            data.append('upload_preset', 'trek_mate_profile');
+            data.append('cloud_name', 'deh4kppsk');
+
+            // 2. Execute Fetch
+            const response = await fetch('https://api.cloudinary.com/v1_1/deh4kppsk/image/upload', {
+                method: 'POST',
+                body: data,
+                headers: {
+                    'Accept': 'application/json',
+                },
+            });
+
+            const result = await response.json();
+            console.log('[Cloudinary] Result:', result);
+
+            if (!response.ok) {
+                throw new Error(result.error?.message || 'Cloudinary upload failed');
+            }
+
+            const downloadURL = result.secure_url;
+
+            // 3. Update Profile & Database
+            await updateProfile(user, { photoURL: downloadURL });
+            await updateDoc(doc(db, 'users', user.uid), {
+                photoURL: downloadURL,
+                lastProfileUpdate: new Date()
             });
 
             setProfileImage(downloadURL);
-            Alert.alert('Success', 'Profile picture updated!');
+            Alert.alert('Success', 'Profile picture updated! ✨');
         } catch (error) {
-            console.error('Upload error:', error);
-            Alert.alert('Error', 'Failed to upload image.');
+            console.error('[Cloudinary] Error:', error);
+            Alert.alert('Upload Failed',
+                `Error: ${error.message}\n\n1. Check your internet.\n2. Verify "trek_mate_profile" is an UNSIGNED preset in Cloudinary dashboard.`
+            );
         } finally {
             setUploading(false);
         }
@@ -154,7 +210,7 @@ const ProfileScreen = ({ navigation }) => {
                     {/* Stats Section */}
                     <View style={styles.statsRow}>
                         <View style={styles.statItem}>
-                            <Text style={styles.statNumber}>0</Text>
+                            <Text style={styles.statNumber}>{myTrips.length}</Text>
                             <Text style={styles.statLabel}>Treks Done</Text>
                         </View>
                         <View style={styles.statDivider} />
@@ -164,6 +220,7 @@ const ProfileScreen = ({ navigation }) => {
                         </View>
                     </View>
                 </View>
+
 
                 {/* Account Menu Section */}
                 <View style={styles.menuSection}>
@@ -203,7 +260,7 @@ const styles = StyleSheet.create({
         borderBottomColor: '#f0f0f0',
     },
     headerTitle: {
-        fontSize: 28,
+        fontSize: 24,
         fontFamily: 'Syne-ExtraBold',
         color: '#1C3D3E',
         textAlign: 'center',
@@ -213,7 +270,25 @@ const styles = StyleSheet.create({
     },
     profileSection: {
         alignItems: 'center',
-        paddingVertical: 40,
+        paddingTop: 30,
+        paddingBottom: 20,
+    },
+    sectionHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 25,
+        marginBottom: 15,
+    },
+    sectionTitle: {
+        fontSize: 18,
+        fontFamily: 'Syne-Bold',
+        color: '#1C3D3E',
+    },
+    seeAllText: {
+        fontSize: 14,
+        fontFamily: 'Syne-Bold',
+        color: '#666',
     },
     avatarContainer: {
         position: 'relative',
