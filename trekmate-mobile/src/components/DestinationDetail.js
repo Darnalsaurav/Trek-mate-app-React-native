@@ -10,6 +10,15 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
+import { auth, db } from '../config/firebase';
+import { 
+    doc, 
+    setDoc, 
+    getDoc, 
+    updateDoc, 
+    arrayUnion,
+    serverTimestamp 
+} from 'firebase/firestore';
 
 const DestinationDetail = ({ route, navigation }) => {
     const { destination } = route.params || {};
@@ -28,6 +37,57 @@ const DestinationDetail = ({ route, navigation }) => {
         { label: 'Duration', value: currentDestination.duration || '12hrs' },
         { label: 'Elevation', value: currentDestination.elevation || '5360m' }
     ];
+
+    const handleJoinTrip = async () => {
+        if (!auth.currentUser) {
+            alert('Please login to join this trip');
+            return;
+        }
+
+        const trekId = currentDestination.id || currentDestination.name.replace(/\s+/g, '-').toLowerCase();
+        const startDate = currentDestination.startDate || 'TBD';
+        const groupName = `${currentDestination.name} ${startDate}`;
+        const groupId = `group_${trekId}`;
+
+        try {
+            const groupRef = doc(db, 'groups', groupId);
+            const groupSnap = await getDoc(groupRef);
+
+            if (groupSnap.exists()) {
+                // Join existing group
+                await updateDoc(groupRef, {
+                    members: arrayUnion(auth.currentUser.uid)
+                });
+            } else {
+                // Create new group
+                await setDoc(groupRef, {
+                    id: groupId,
+                    name: groupName,
+                    trekId: trekId,
+                    members: [auth.currentUser.uid],
+                    createdAt: serverTimestamp(),
+                    lastMessage: 'Welcome to the group!',
+                    lastMessageTime: serverTimestamp(),
+                    type: 'group',
+                    avatar: currentDestination.image || 'https://via.placeholder.com/150'
+                });
+            }
+
+            // Navigate to the chat
+            navigation.navigate('Chat', { 
+                chatUser: { 
+                    id: groupId, 
+                    name: groupName,
+                    isGroup: true,
+                    avatar: currentDestination.image || 'https://via.placeholder.com/150'
+                } 
+            });
+
+        } catch (error) {
+            console.error("Error joining trip:", error);
+            alert('Failed to join trip. Please try again.');
+        }
+    };
 
     return (
         <View style={styles.container}>
@@ -126,7 +186,10 @@ const DestinationDetail = ({ route, navigation }) => {
                     </View>
 
                     {/* Join Button */}
-                    <TouchableOpacity style={styles.joinBtn}>
+                    <TouchableOpacity 
+                        style={styles.joinBtn}
+                        onPress={handleJoinTrip}
+                    >
                         <Text style={styles.joinBtnText}>Join Trip</Text>
                     </TouchableOpacity>
                 </View>

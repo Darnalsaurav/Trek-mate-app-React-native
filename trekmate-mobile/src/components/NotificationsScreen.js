@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
     View,
     Text,
@@ -6,27 +6,83 @@ import {
     FlatList,
     TouchableOpacity,
     StatusBar,
+    ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { setUnreadCount } from '../utils/notificationStore';
+import {
+    subscribeToUserNotifications,
+    markAllAsRead,
+    setUnreadCount,
+} from '../utils/notificationStore';
+
+const NOTIF_TYPE_CONFIG = {
+    trek_submitted: { fallbackIcon: 'document-text', fallbackColor: '#F59E0B' },
+    trek_accepted: { fallbackIcon: 'checkmark-circle', fallbackColor: '#10B981' },
+    trek_approved: { fallbackIcon: 'trail-sign', fallbackColor: '#1C3D3E' },
+    trek_rejected: { fallbackIcon: 'close-circle', fallbackColor: '#EF4444' },
+    general: { fallbackIcon: 'notifications', fallbackColor: '#6366F1' },
+};
 
 const NotificationsScreen = ({ navigation }) => {
+    const [notifications, setNotifications] = useState([]);
+    const [loading, setLoading] = useState(true);
+
     useEffect(() => {
-        // Mark as read when screen is viewed
-        setUnreadCount(0);
+        // Mark all as read when viewing
+        markAllAsRead();
+
+        const unsubscribe = subscribeToUserNotifications((notifs) => {
+            setNotifications(notifs);
+            setLoading(false);
+        });
+
+        return unsubscribe;
     }, []);
 
-    const notifications = [
-        {
-            id: '1',
-            title: 'Welcome to TrekMate family!',
-            message: 'Start exploring beautiful destinations and finding trek mates.',
-            time: 'Just now',
-            icon: 'heart',
-            color: '#FF6B6B',
-        },
-    ];
+    const getIconName = (item) => {
+        const validIcons = [
+            'heart', 'checkmark-circle', 'close-circle', 'trail-sign',
+            'document-text', 'notifications', 'alert-circle', 'time',
+            'map', 'navigate', 'person', 'star',
+        ];
+        if (item.icon && validIcons.includes(item.icon)) return item.icon;
+        const config = NOTIF_TYPE_CONFIG[item.type];
+        return config?.fallbackIcon || 'notifications';
+    };
+
+    const getColor = (item) => {
+        if (item.color) return item.color;
+        const config = NOTIF_TYPE_CONFIG[item.type];
+        return config?.fallbackColor || '#1C3D3E';
+    };
+
+    const renderNotification = ({ item }) => {
+        const iconName = getIconName(item);
+        const color = getColor(item);
+        const isUnread = !item.read;
+
+        return (
+            <TouchableOpacity
+                style={[styles.notificationItem, isUnread && styles.unreadItem]}
+                activeOpacity={0.7}
+            >
+                <View style={[styles.iconContainer, { backgroundColor: color + '20' }]}>
+                    <Ionicons name={iconName} size={24} color={color} />
+                </View>
+                <View style={styles.textContainer}>
+                    <View style={styles.titleRow}>
+                        <Text style={[styles.notificationTitle, isUnread && styles.unreadTitle]}>
+                            {item.title}
+                        </Text>
+                        {isUnread && <View style={styles.unreadDot} />}
+                    </View>
+                    <Text style={styles.notificationMessage}>{item.message}</Text>
+                    <Text style={styles.notificationTime}>{item.time}</Text>
+                </View>
+            </TouchableOpacity>
+        );
+    };
 
     return (
         <SafeAreaView style={styles.container}>
@@ -39,32 +95,31 @@ const NotificationsScreen = ({ navigation }) => {
                     <Ionicons name="arrow-back" size={28} color="#1C3D3E" />
                 </TouchableOpacity>
                 <Text style={styles.headerTitle}>Notifications</Text>
-                <View style={{ width: 40 }} /> {/* Spacer for centering title */}
+                <View style={{ width: 40 }} />
             </View>
 
-            <FlatList
-                data={notifications}
-                renderItem={({ item }) => (
-                    <TouchableOpacity style={styles.notificationItem} activeOpacity={0.7}>
-                        <View style={[styles.iconContainer, { backgroundColor: item.color + '20' }]}>
-                            <Ionicons name={item.icon} size={24} color={item.color} />
+            {loading ? (
+                <View style={styles.loadingContainer}>
+                    <ActivityIndicator size="large" color="#1C3D3E" />
+                </View>
+            ) : (
+                <FlatList
+                    data={notifications}
+                    renderItem={renderNotification}
+                    keyExtractor={item => item.id}
+                    contentContainerStyle={styles.listContent}
+                    showsVerticalScrollIndicator={false}
+                    ListEmptyComponent={
+                        <View style={styles.emptyContainer}>
+                            <Ionicons name="notifications-off-outline" size={80} color="#ddd" />
+                            <Text style={styles.emptyText}>No notifications yet</Text>
+                            <Text style={styles.emptySubtext}>
+                                You'll receive notifications when treks are approved or updated.
+                            </Text>
                         </View>
-                        <View style={styles.textContainer}>
-                            <Text style={styles.notificationTitle}>{item.title}</Text>
-                            <Text style={styles.notificationMessage}>{item.message}</Text>
-                            <Text style={styles.notificationTime}>{item.time}</Text>
-                        </View>
-                    </TouchableOpacity>
-                )}
-                keyExtractor={item => item.id}
-                contentContainerStyle={styles.listContent}
-                ListEmptyComponent={
-                    <View style={styles.emptyContainer}>
-                        <Ionicons name="notifications-off-outline" size={80} color="#ddd" />
-                        <Text style={styles.emptyText}>No notifications yet</Text>
-                    </View>
-                }
-            />
+                    }
+                />
+            )}
         </SafeAreaView>
     );
 };
@@ -91,16 +146,27 @@ const styles = StyleSheet.create({
         fontFamily: 'Syne-Bold',
         color: '#1C3D3E',
     },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
     listContent: {
         padding: 20,
+        paddingBottom: 40,
     },
     notificationItem: {
         flexDirection: 'row',
         backgroundColor: '#f9f9f9',
         borderRadius: 15,
         padding: 15,
-        marginBottom: 15,
+        marginBottom: 12,
         alignItems: 'center',
+    },
+    unreadItem: {
+        backgroundColor: '#F0FDF4',
+        borderLeftWidth: 3,
+        borderLeftColor: '#10B981',
     },
     iconContainer: {
         width: 50,
@@ -113,17 +179,34 @@ const styles = StyleSheet.create({
     textContainer: {
         flex: 1,
     },
+    titleRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'space-between',
+    },
     notificationTitle: {
-        fontSize: 16,
+        fontSize: 15,
         fontFamily: 'Syne-Bold',
         color: '#1C3D3E',
         marginBottom: 4,
+        flex: 1,
+    },
+    unreadTitle: {
+        fontFamily: 'Syne-ExtraBold',
+    },
+    unreadDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+        backgroundColor: '#10B981',
+        marginLeft: 8,
     },
     notificationMessage: {
-        fontSize: 14,
+        fontSize: 13,
         fontFamily: 'Syne-Regular',
         color: '#666',
         marginBottom: 6,
+        lineHeight: 18,
     },
     notificationTime: {
         fontSize: 12,
@@ -141,6 +224,14 @@ const styles = StyleSheet.create({
         fontFamily: 'Syne-Bold',
         color: '#999',
         marginTop: 20,
+    },
+    emptySubtext: {
+        fontSize: 13,
+        fontFamily: 'Syne-Regular',
+        color: '#bbb',
+        textAlign: 'center',
+        marginTop: 8,
+        paddingHorizontal: 40,
     },
 });
 

@@ -12,6 +12,31 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import { subscribeToMyTrips } from '../utils/destinationStore';
+import { TREK_STATUS } from '../config/admin';
+
+const STATUS_CONFIG = {
+    [TREK_STATUS.PENDING]: {
+        color: '#F59E0B',
+        bgColor: 'rgba(245, 158, 11, 0.15)',
+        solidBg: '#FEF3C7',
+        icon: 'time-outline',
+        label: 'Pending Review',
+    },
+    [TREK_STATUS.ACCEPTED]: {
+        color: '#10B981',
+        bgColor: 'rgba(16, 185, 129, 0.15)',
+        solidBg: '#D1FAE5',
+        icon: 'checkmark-circle',
+        label: 'Approved ✓',
+    },
+    [TREK_STATUS.REJECTED]: {
+        color: '#EF4444',
+        bgColor: 'rgba(239, 68, 68, 0.15)',
+        solidBg: '#FEE2E2',
+        icon: 'close-circle',
+        label: 'Rejected',
+    },
+};
 
 const MyTripsScreen = ({ navigation }) => {
     const [trips, setTrips] = useState([]);
@@ -24,6 +49,18 @@ const MyTripsScreen = ({ navigation }) => {
         });
         return unsubscribe;
     }, []);
+
+    const renderStatusBadge = (status) => {
+        const config = STATUS_CONFIG[status] || STATUS_CONFIG[TREK_STATUS.PENDING];
+        return (
+            <View style={[styles.approvalBadge, { backgroundColor: config.solidBg }]}>
+                <Ionicons name={config.icon} size={13} color={config.color} />
+                <Text style={[styles.approvalText, { color: config.color }]}>
+                    {config.label}
+                </Text>
+            </View>
+        );
+    };
 
     return (
         <SafeAreaView style={styles.container}>
@@ -53,34 +90,72 @@ const MyTripsScreen = ({ navigation }) => {
                 </View>
             ) : (
                 <ScrollView contentContainerStyle={styles.scrollContent}>
+                    {/* Status Legend */}
+                    <View style={styles.legendContainer}>
+                        <View style={styles.legendItem}>
+                            <View style={[styles.legendDot, { backgroundColor: '#F59E0B' }]} />
+                            <Text style={styles.legendText}>Pending</Text>
+                        </View>
+                        <View style={styles.legendItem}>
+                            <View style={[styles.legendDot, { backgroundColor: '#10B981' }]} />
+                            <Text style={styles.legendText}>Approved</Text>
+                        </View>
+                        <View style={styles.legendItem}>
+                            <View style={[styles.legendDot, { backgroundColor: '#EF4444' }]} />
+                            <Text style={styles.legendText}>Rejected</Text>
+                        </View>
+                    </View>
+
                     <View style={styles.cardsContainer}>
-                        {trips.map((trip) => (
-                            <TouchableOpacity
-                                key={trip.id}
-                                style={styles.card}
-                                activeOpacity={0.9}
-                                onPress={() => navigation.navigate('DestinationDetail', { destination: trip })}
-                            >
-                                <Image
-                                    source={{ uri: trip.image }}
-                                    style={styles.cardImage}
-                                />
-                                <LinearGradient
-                                    colors={['transparent', 'rgba(0,0,0,0.8)']}
-                                    style={styles.cardGradient}
-                                />
-                                <View style={styles.cardLabel}>
-                                    <View style={styles.titleRow}>
-                                        <Text style={styles.cardName}>{trip.name}</Text>
-                                        <View style={styles.dateBadge}>
-                                            <Ionicons name="calendar-outline" size={12} color="white" />
-                                            <Text style={styles.dateText}>{trip.startDate}</Text>
-                                        </View>
+                        {trips.map((trip) => {
+                            const statusConfig = STATUS_CONFIG[trip.approvalStatus] || STATUS_CONFIG[TREK_STATUS.PENDING];
+                            return (
+                                <TouchableOpacity
+                                    key={trip.id}
+                                    style={[
+                                        styles.card,
+                                        { borderLeftWidth: 4, borderLeftColor: statusConfig.color },
+                                    ]}
+                                    activeOpacity={0.9}
+                                    onPress={() => navigation.navigate('DestinationDetail', { destination: trip })}
+                                >
+                                    <Image
+                                        source={{ uri: trip.image }}
+                                        style={styles.cardImage}
+                                    />
+                                    <LinearGradient
+                                        colors={['transparent', 'rgba(0,0,0,0.8)']}
+                                        style={styles.cardGradient}
+                                    />
+
+                                    {/* Status Badge on image */}
+                                    <View style={styles.statusOverlay}>
+                                        {renderStatusBadge(trip.approvalStatus)}
                                     </View>
-                                    <Text style={styles.cardLocation}>{trip.location}</Text>
-                                </View>
-                            </TouchableOpacity>
-                        ))}
+
+                                    <View style={styles.cardLabel}>
+                                        <View style={styles.titleRow}>
+                                            <Text style={styles.cardName}>{trip.name}</Text>
+                                            <View style={styles.dateBadge}>
+                                                <Ionicons name="calendar-outline" size={12} color="white" />
+                                                <Text style={styles.dateText}>{trip.startDate}</Text>
+                                            </View>
+                                        </View>
+                                        <Text style={styles.cardLocation}>{trip.location}</Text>
+                                    </View>
+
+                                    {/* Rejection Reason Banner */}
+                                    {trip.approvalStatus === TREK_STATUS.REJECTED && trip.rejectionReason && (
+                                        <View style={styles.rejectionBanner}>
+                                            <Ionicons name="alert-circle" size={14} color="#EF4444" />
+                                            <Text style={styles.rejectionText} numberOfLines={2}>
+                                                {trip.rejectionReason}
+                                            </Text>
+                                        </View>
+                                    )}
+                                </TouchableOpacity>
+                            );
+                        })}
                     </View>
                 </ScrollView>
             )}
@@ -138,6 +213,28 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontFamily: 'Syne-Bold',
     },
+    legendContainer: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: 20,
+        marginBottom: 20,
+        paddingHorizontal: 20,
+    },
+    legendItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 5,
+    },
+    legendDot: {
+        width: 8,
+        height: 8,
+        borderRadius: 4,
+    },
+    legendText: {
+        fontSize: 12,
+        fontFamily: 'Syne-Regular',
+        color: '#666',
+    },
     scrollContent: {
         paddingHorizontal: 20,
         paddingBottom: 40,
@@ -166,6 +263,23 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
         height: '60%',
+    },
+    statusOverlay: {
+        position: 'absolute',
+        top: 12,
+        right: 12,
+    },
+    approvalBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: 20,
+        gap: 4,
+    },
+    approvalText: {
+        fontSize: 11,
+        fontFamily: 'Syne-Bold',
     },
     cardLabel: {
         position: 'absolute',
@@ -199,7 +313,25 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 11,
         fontFamily: 'Syne-Bold',
-    }
+    },
+    rejectionBanner: {
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
+        right: 0,
+        backgroundColor: 'rgba(254, 226, 226, 0.95)',
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 14,
+        paddingVertical: 8,
+        gap: 6,
+    },
+    rejectionText: {
+        flex: 1,
+        fontSize: 11,
+        fontFamily: 'Syne-Regular',
+        color: '#B91C1C',
+    },
 });
 
 export default MyTripsScreen;

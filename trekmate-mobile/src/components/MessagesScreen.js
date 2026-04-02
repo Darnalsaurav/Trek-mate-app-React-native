@@ -15,7 +15,7 @@ import { auth, db } from '../config/firebase';
 import { collection, query, where, onSnapshot } from 'firebase/firestore';
 
 const MessagesScreen = ({ navigation }) => {
-    const [users, setUsers] = useState([]);
+    const [groups, setGroups] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
 
@@ -26,37 +26,38 @@ const MessagesScreen = ({ navigation }) => {
         }
 
         const q = query(
-            collection(db, 'users'),
-            where('uid', '!=', auth.currentUser.uid)
+            collection(db, 'groups'),
+            where('members', 'array-contains', auth.currentUser.uid)
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const userList = snapshot.docs.map(doc => {
+            const groupList = snapshot.docs.map(doc => {
                 const data = doc.data();
-                const email = data.email || '';
                 return {
                     id: doc.id,
                     ...data,
-                    name: data.displayName || (email ? email.split('@')[0] : 'Unknown Trekker'),
-                    email: email,
-                    avatar: data.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png',
-                    lastMessage: 'Tap to start chatting!',
-                    time: '',
+                    name: data.name || 'Unnamed Group',
+                    avatar: data.avatar || 'https://cdn-icons-png.flaticon.com/512/149/149071.png',
+                    lastMessage: data.lastMessage || 'Start trekking together!',
+                    time: data.lastMessageTime?.toDate ? data.lastMessageTime.toDate().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '',
                     unread: 0,
+                    isGroup: true,
                 };
             });
-            setUsers(userList);
+            setGroups(groupList);
+            setLoading(false);
+        }, (error) => {
+            console.error("Error fetching groups:", error);
             setLoading(false);
         });
 
         return () => unsubscribe();
     }, []);
 
-    const filteredUsers = users.filter(user => {
-        const name = user.name || '';
-        const email = user.email || '';
+    const filteredGroups = groups.filter(group => {
+        const name = group.name || '';
         const queryVal = searchQuery.toLowerCase();
-        return name.toLowerCase().includes(queryVal) || email.toLowerCase().includes(queryVal);
+        return name.toLowerCase().includes(queryVal);
     });
 
     const renderChatItem = ({ item }) => (
@@ -66,7 +67,6 @@ const MessagesScreen = ({ navigation }) => {
         >
             <View style={styles.avatarContainer}>
                 <Image source={{ uri: item.avatar }} style={styles.avatar} />
-                {item.isOnline ? <View style={styles.onlineIndicator} /> : null}
             </View>
 
             <View style={styles.chatInfo}>
@@ -79,7 +79,7 @@ const MessagesScreen = ({ navigation }) => {
                         style={[styles.previewText, item.unread > 0 ? styles.unreadText : null]}
                         numberOfLines={1}
                     >
-                        {searchQuery ? item.email : item.lastMessage}
+                        {item.lastMessage}
                     </Text>
                     {item.unread > 0 ? (
                         <View style={styles.unreadBadge}>
@@ -104,7 +104,7 @@ const MessagesScreen = ({ navigation }) => {
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.header}>
-                <Text style={styles.headerTitle}>Messages</Text>
+                <Text style={styles.headerTitle}>Trek Groups</Text>
                 <TouchableOpacity style={styles.iconBtn}>
                     <Ionicons name="create-outline" size={24} color="#111827" />
                 </TouchableOpacity>
@@ -114,7 +114,7 @@ const MessagesScreen = ({ navigation }) => {
                 <View style={styles.searchBar}>
                     <Ionicons name="search" size={24} color="#1C3D3E" style={styles.searchIcon} />
                     <TextInput
-                        placeholder="Search messages..."
+                        placeholder="Search trek groups..."
                         style={styles.searchInput}
                         placeholderTextColor="#999"
                         value={searchQuery}
@@ -129,13 +129,13 @@ const MessagesScreen = ({ navigation }) => {
                 <ActivityIndicator size="large" color="#1C3D3E" style={{ marginTop: 20 }} />
             ) : (
                 <FlatList
-                    data={filteredUsers}
+                    data={filteredGroups}
                     renderItem={renderChatItem}
                     keyExtractor={item => item.id}
                     contentContainerStyle={[styles.listContent, { paddingBottom: 120 }]}
                     ListEmptyComponent={() => (
                         <View style={{ alignItems: 'center', marginTop: 50 }}>
-                            <Text style={{ fontFamily: 'Syne-Regular', color: '#666' }}>No users found</Text>
+                            <Text style={{ fontFamily: 'Syne-Regular', color: '#666' }}>Join a trip to see groups!</Text>
                         </View>
                     )}
                 />

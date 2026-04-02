@@ -12,20 +12,35 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import { Modal, FlatList as RNFlatList } from 'react-native';
 import { db, auth } from '../config/firebase';
-import { collection, addDoc, query, orderBy, onSnapshot, serverTimestamp, where } from 'firebase/firestore';
+import { 
+    collection, 
+    addDoc, 
+    query, 
+    orderBy, 
+    onSnapshot, 
+    serverTimestamp, 
+    where,
+    doc,
+    getDoc,
+    updateDoc 
+} from 'firebase/firestore';
 import { getChatId } from '../utils/chatUtils';
 
 const ChatScreen = ({ route, navigation }) => {
     const { chatUser } = route.params;
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState('');
+    const [showMembers, setShowMembers] = useState(false);
+    const [groupMembers, setGroupMembers] = useState([]);
+    const [loadingMembers, setLoadingMembers] = useState(false);
     const flatListRef = useRef(null);
 
     useEffect(() => {
         if (!chatUser || !auth.currentUser) return;
 
-        const chatId = getChatId(auth.currentUser.uid, chatUser.id);
+        const chatId = chatUser.isGroup ? chatUser.id : getChatId(auth.currentUser.uid, chatUser.id);
         if (!chatId) return;
 
         const q = query(
@@ -49,10 +64,39 @@ const ChatScreen = ({ route, navigation }) => {
         return () => unsubscribe();
     }, [chatUser]);
 
+    const fetchMembers = async () => {
+        if (!chatUser.isGroup) return;
+        setLoadingMembers(true);
+        setShowMembers(true);
+
+        try {
+            const groupRef = doc(db, 'groups', chatUser.id);
+            const groupSnap = await getDoc(groupRef);
+            
+            if (groupSnap.exists()) {
+                const memberUids = groupSnap.data().members || [];
+                const memberData = [];
+                
+                // Fetch profiles for all UIDs
+                for (const uid of memberUids) {
+                    const userSnap = await getDoc(doc(db, 'users', uid));
+                    if (userSnap.exists()) {
+                        memberData.push({ id: uid, ...userSnap.data() });
+                    }
+                }
+                setGroupMembers(memberData);
+            }
+        } catch (error) {
+            console.error("Error fetching members:", error);
+        } finally {
+            setLoadingMembers(false);
+        }
+    };
+
     const handleSendMessage = async () => {
         if (newMessage.trim() === '' || !auth.currentUser || !chatUser) return;
 
-        const chatId = getChatId(auth.currentUser.uid, chatUser.id);
+        const chatId = chatUser.isGroup ? chatUser.id : getChatId(auth.currentUser.uid, chatUser.id);
         const textToSend = newMessage;
 
         setNewMessage('');
@@ -64,8 +108,17 @@ const ChatScreen = ({ route, navigation }) => {
                 senderId: auth.currentUser.uid,
                 receiverId: chatUser.id,
                 chatId: chatId,
-                senderName: auth.currentUser.displayName || 'Unknown'
+                senderName: auth.currentUser.displayName || auth.currentUser.email?.split('@')[0] || 'Unknown'
             });
+
+            // Update group/chat room metadata
+            if (chatUser.isGroup) {
+                const groupRef = doc(db, 'groups', chatId);
+                await updateDoc(groupRef, {
+                    lastMessage: textToSend,
+                    lastMessageTime: serverTimestamp()
+                });
+            }
         } catch (error) {
             console.error("Error sending message:", error);
             setNewMessage(textToSend);
@@ -76,13 +129,18 @@ const ChatScreen = ({ route, navigation }) => {
         const isMyMessage = item.senderId === auth.currentUser?.uid;
         return (
             <View style={[styles.messageRow, isMyMessage ? styles.sentRow : styles.receivedRow]}>
-                <View style={[styles.messageBubble, isMyMessage ? styles.sentBubble : styles.receivedBubble]}>
-                    <Text style={[styles.messageText, isMyMessage ? styles.sentText : styles.receivedText]}>
-                        {item.text}
-                    </Text>
-                    <Text style={[styles.timestamp, isMyMessage ? styles.sentTimestamp : styles.receivedTimestamp]}>
-                        {item.createdAt instanceof Date ? item.createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
-                    </Text>
+                <View style={[styles.messageContent, isMyMessage ? styles.sentContent : styles.receivedContent]}>
+                    {!isMyMessage && chatUser.isGroup && (
+                        <Text style={styles.senderLabel}>{item.senderName}</Text>
+                    )}
+                    <View style={[styles.messageBubble, isMyMessage ? styles.sentBubble : styles.receivedBubble]}>
+                        <Text style={[styles.messageText, isMyMessage ? styles.sentText : styles.receivedText]}>
+                            {item.text}
+                        </Text>
+                        <Text style={[styles.timestamp, isMyMessage ? styles.sentTimestamp : styles.receivedTimestamp]}>
+                            {item.createdAt instanceof Date ? item.createdAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Just now'}
+                        </Text>
+                    </View>
                 </View>
             </View>
         );
@@ -100,18 +158,22 @@ const ChatScreen = ({ route, navigation }) => {
                     <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
                         <Ionicons name="chevron-back" size={28} color="#374151" />
                     </TouchableOpacity>
-                    <View style={styles.headerInfo}>
+                    <TouchableOpacity 
+                        style={styles.headerInfo} 
+                        onPress={fetchMembers}
+                        activeOpacity={0.7}
+                    >
                         <Image
                             source={{ uri: chatUser.avatar || 'https://via.placeholder.com/40' }}
                             style={styles.avatar}
                         />
                         <View>
                             <Text style={styles.headerName}>{chatUser.name}</Text>
-                            {chatUser.isOnline ? <Text style={styles.statusText}>Online</Text> : null}
+                            <Text style={styles.statusText}>Tap to see members</Text>
                         </View>
-                    </View>
-                    <TouchableOpacity style={styles.moreBtn}>
-                        <Ionicons name="ellipsis-vertical" size={24} color="#1C3D3E" />
+                    </TouchableOpacity>
+                    <TouchableOpacity style={styles.moreBtn} onPress={fetchMembers}>
+                        <Ionicons name="people-outline" size={24} color="#1C3D3E" />
                     </TouchableOpacity>
                 </View>
 
@@ -146,6 +208,52 @@ const ChatScreen = ({ route, navigation }) => {
                         <Ionicons name="send" size={20} color="white" />
                     </TouchableOpacity>
                 </View>
+
+                {/* Members Modal */}
+                <Modal
+                    visible={showMembers}
+                    animationType="slide"
+                    transparent={true}
+                    onRequestClose={() => setShowMembers(false)}
+                >
+                    <View style={styles.modalOverlay}>
+                        <View style={styles.modalContent}>
+                            <View style={styles.modalHeader}>
+                                <Text style={styles.modalTitle}>Trekkers Joined</Text>
+                                <TouchableOpacity onPress={() => setShowMembers(false)}>
+                                    <Ionicons name="close" size={24} color="#1C3D3E" />
+                                </TouchableOpacity>
+                            </View>
+                            
+                            {loadingMembers ? (
+                                <View style={styles.loadingContainer}>
+                                    <Text style={styles.loadingText}>Fetching trekkers...</Text>
+                                </View>
+                            ) : (
+                                <RNFlatList
+                                    data={groupMembers}
+                                    keyExtractor={item => item.id}
+                                    renderItem={({ item }) => (
+                                        <View style={styles.memberItem}>
+                                            <Image 
+                                                source={{ uri: item.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png' }} 
+                                                style={styles.memberAvatar} 
+                                            />
+                                            <View>
+                                                <Text style={styles.memberName}>{item.displayName || item.email?.split('@')[0] || 'Trekker'}</Text>
+                                                <Text style={styles.memberEmail}>{item.email}</Text>
+                                            </View>
+                                        </View>
+                                    )}
+                                    ListEmptyComponent={() => (
+                                        <Text style={styles.emptyText}>Only you have joined yet.</Text>
+                                    )}
+                                    contentContainerStyle={styles.memberList}
+                                />
+                            )}
+                        </View>
+                    </View>
+                </Modal>
             </KeyboardAvoidingView>
         </SafeAreaView>
     );
@@ -211,8 +319,16 @@ const styles = StyleSheet.create({
     receivedRow: {
         justifyContent: 'flex-start',
     },
-    messageBubble: {
+    messageContent: {
         maxWidth: '75%',
+    },
+    sentContent: {
+        alignItems: 'flex-end',
+    },
+    receivedContent: {
+        alignItems: 'flex-start',
+    },
+    messageBubble: {
         paddingVertical: 12,
         paddingHorizontal: 16,
         borderRadius: 20,
@@ -250,6 +366,13 @@ const styles = StyleSheet.create({
     receivedTimestamp: {
         color: '#9ca3af',
         textAlign: 'right',
+    },
+    senderLabel: {
+        fontSize: 10,
+        fontFamily: 'Syne-Bold',
+        color: '#1C3D3E',
+        marginBottom: 2,
+        marginLeft: 4,
     },
     inputArea: {
         flexDirection: 'row',
@@ -291,6 +414,71 @@ const styles = StyleSheet.create({
     sendBtnDisabled: {
         backgroundColor: '#9ca3af',
         elevation: 0,
+    },
+    // Modal Styles
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.5)',
+        justifyContent: 'flex-end',
+    },
+    modalContent: {
+        backgroundColor: 'white',
+        borderTopLeftRadius: 32,
+        borderTopRightRadius: 32,
+        height: '70%',
+        padding: 24,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 20,
+    },
+    modalTitle: {
+        fontSize: 20,
+        fontFamily: 'Syne-Bold',
+        color: '#1C3D3E',
+    },
+    memberList: {
+        paddingBottom: 20,
+    },
+    memberItem: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingVertical: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f3f4f6',
+    },
+    memberAvatar: {
+        width: 50,
+        height: 50,
+        borderRadius: 25,
+        marginRight: 15,
+    },
+    memberName: {
+        fontSize: 16,
+        fontFamily: 'Syne-Bold',
+        color: '#111827',
+    },
+    memberEmail: {
+        fontSize: 12,
+        fontFamily: 'Syne-Regular',
+        color: '#6b7280',
+    },
+    loadingContainer: {
+        flex: 1,
+        justifyContent: 'center',
+        alignItems: 'center',
+    },
+    loadingText: {
+        fontFamily: 'Syne-Regular',
+        color: '#1C3D3E',
+    },
+    emptyText: {
+        textAlign: 'center',
+        fontFamily: 'Syne-Regular',
+        color: '#666',
+        marginTop: 20,
     },
 });
 

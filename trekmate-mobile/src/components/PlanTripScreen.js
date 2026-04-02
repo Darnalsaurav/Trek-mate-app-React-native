@@ -73,9 +73,11 @@ const PlanTripScreen = ({ navigation }) => {
             setEndDate('');
             setImage(null);
 
-            Alert.alert('Trip Confirmed! 🎉', `Your trek to ${destination} has been planned and shared with the community.`, [
-                { text: 'OK', onPress: () => navigation.navigate('ExploreTab') }
-            ]);
+            Alert.alert(
+                'Trek Submitted! 🎉',
+                `Your trek to ${destination} has been submitted for review. It will appear in Explore & Upcoming Treks once approved by admin.`,
+                [{ text: 'View My Trips', onPress: () => navigation.navigate('MyTrips') }]
+            );
         } catch (error) {
             Alert.alert('Error', 'Failed to save your trip. Please try again.');
         } finally {

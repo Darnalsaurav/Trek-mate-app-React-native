@@ -20,9 +20,15 @@ import * as ImagePicker from 'expo-image-picker';
 import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { subscribeToMyTrips } from '../utils/destinationStore';
+import { isAdminUser } from '../config/admin';
 
 const ProfileScreen = ({ navigation }) => {
     const user = auth.currentUser;
+    // DEBUG: Remove this after confirming admin works
+    console.log('🔑 Admin Check:', {
+        currentEmail: user?.email,
+        isAdmin: isAdminUser(user),
+    });
     const [uploading, setUploading] = useState(false);
     const [profileImage, setProfileImage] = useState(user?.photoURL || null);
     const [bio, setBio] = useState('Happy Trekking! 🏔️');
@@ -236,6 +242,23 @@ const ProfileScreen = ({ navigation }) => {
                         <Text style={styles.menuText}>My Trips</Text>
                         <Ionicons name="chevron-forward" size={20} color="#CCC" />
                     </TouchableOpacity>
+
+                    {/* Admin Dashboard — only visible to admin */}
+                    {isAdminUser(user) && (
+                        <TouchableOpacity
+                            style={styles.menuItem}
+                            onPress={() => navigation.navigate('AdminDashboard')}
+                        >
+                            <View style={[styles.menuIconContainer, { backgroundColor: '#EDE9FE' }]}>
+                                <Ionicons name="shield-checkmark-outline" size={22} color="#7C3AED" />
+                            </View>
+                            <Text style={styles.menuText}>Trek Approvals</Text>
+                            <View style={styles.adminLabel}>
+                                <Text style={styles.adminLabelText}>ADMIN</Text>
+                            </View>
+                            <Ionicons name="chevron-forward" size={20} color="#CCC" />
+                        </TouchableOpacity>
+                    )}
                 </View>
 
                 <TouchableOpacity style={styles.logoutButton} onPress={handleSignOut}>
@@ -457,6 +480,19 @@ const styles = StyleSheet.create({
         fontSize: 16,
         fontFamily: 'Syne-Bold',
         color: '#444',
+    },
+    adminLabel: {
+        backgroundColor: '#7C3AED',
+        paddingHorizontal: 8,
+        paddingVertical: 3,
+        borderRadius: 6,
+        marginRight: 8,
+    },
+    adminLabelText: {
+        color: '#fff',
+        fontSize: 9,
+        fontFamily: 'Syne-ExtraBold',
+        letterSpacing: 0.5,
     },
     logoutButton: {
         backgroundColor: '#1C3D3E',

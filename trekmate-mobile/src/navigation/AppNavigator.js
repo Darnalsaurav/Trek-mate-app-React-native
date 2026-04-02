@@ -24,6 +24,7 @@ import FloatingNavbar from '../components/FloatingNavbar';
 import NotificationsScreen from '../components/NotificationsScreen';
 import WeatherScreen from '../components/WeatherScreen';
 import MyTripsScreen from '../components/MyTripsScreen';
+import AdminDashboard from '../components/AdminDashboard';
 
 const Stack = createNativeStackNavigator();
 const Tab = createBottomTabNavigator();
@@ -113,6 +114,11 @@ export default function AppNavigator() {
                         <Stack.Screen
                             name="MyTrips"
                             component={MyTripsScreen}
+                            options={{ gestureEnabled: false }}
+                        />
+                        <Stack.Screen
+                            name="AdminDashboard"
+                            component={AdminDashboard}
                             options={{ gestureEnabled: false }}
                         />
                     </Stack.Group>
