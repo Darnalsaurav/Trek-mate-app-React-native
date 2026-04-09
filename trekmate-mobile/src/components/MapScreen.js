@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
     View,
     Text,
@@ -6,93 +6,236 @@ import {
     TouchableOpacity,
     Linking,
     Platform,
+    Alert,
+    ActivityIndicator,
+    Dimensions,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import MapView, { Marker, PROVIDER_GOOGLE, UrlTile } from 'react-native-maps';
+import MapView, { Marker, Polyline, PROVIDER_GOOGLE, UrlTile } from 'react-native-maps';
+import * as Location from 'expo-location';
+import { TrailService } from '../utils/trailService';
+import { LinearGradient } from 'expo-linear-gradient';
+
+const { width, height } = Dimensions.get('window');
 
 const MapScreen = ({ route, navigation }) => {
     const { destination: destinationData } = route.params || {};
+    
+    const [userLocation, setUserLocation] = useState(null);
+    const [trailCoords, setTrailCoords] = useState([]);
+    const [isLoading, setIsLoading] = useState(true);
+    const [isTracking, setIsTracking] = useState(false);
+    const [offPath, setOffPath] = useState(false);
 
-    // Coordinates mapping or fallback to Everest
-    const getCoordinates = () => {
-        if (destinationData?.name === 'KHUMAI DADA') return { latitude: 28.3789, longitude: 83.9211 };
-        if (destinationData?.name === 'TILICHO LAKE') return { latitude: 28.6833, longitude: 83.8500 };
-        if (destinationData?.name === 'ANNAPURNA CIRCUIT') return { latitude: 28.5333, longitude: 83.8333 };
-        return {
-            latitude: 28.0072,
-            longitude: 86.8522,
+    const mapRef = useRef(null);
+    const locationSubscription = useRef(null);
+
+    // Basic center point (improved geocoding handles the rest)
+    const center = { latitude: 28.0072, longitude: 86.8522 };
+
+    useEffect(() => {
+        loadTrailData();
+        return () => {
+            if (locationSubscription.current) {
+                locationSubscription.current.remove();
+            }
         };
+    }, []);
+
+    const loadTrailData = async () => {
+        setIsLoading(true);
+        try {
+            // 1. Resolve Center Coordinates
+            let targetCoords = null;
+
+            // Check if coordinates already exist in destinationData
+            if (destinationData?.latitude && destinationData?.longitude) {
+                targetCoords = { latitude: destinationData.latitude, longitude: destinationData.longitude };
+            } 
+            // Fallback to hardcoded known values or Geocoding
+            else if (destinationData?.name === 'KHUMAI DADA') targetCoords = { latitude: 28.3789, longitude: 83.9211 };
+            else if (destinationData?.name === 'TILICHO LAKE') targetCoords = { latitude: 28.6833, longitude: 83.8500 };
+            else {
+                // Dynamic Geocoding using Nominatim (OSM)
+                try {
+                    const geoResponse = await fetch(`https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(destinationData?.name || 'Nepal Peaks')}`);
+                    
+                    if (!geoResponse.ok) {
+                        console.warn('Geocoding service returned error status:', geoResponse.status);
+                        return null;
+                    }
+
+                    const geoData = await geoResponse.json();
+                    if (geoData && geoData.length > 0) {
+                        targetCoords = {
+                            latitude: parseFloat(geoData[0].lat),
+                            longitude: parseFloat(geoData[0].lon)
+                        };
+                    }
+                } catch (e) {
+                    console.log('Geocoding failed, using Everest fallback');
+                }
+            }
+
+            // Final fallback
+            const finalCenter = targetCoords || { latitude: 28.0072, longitude: 86.8522 };
+
+            // 2. Load Trail Route
+            const trail = await TrailService.getRouteForLocation(
+                destinationData?.name || 'Trek',
+                finalCenter
+            );
+            
+            if (trail && trail.coordinates) {
+                setTrailCoords(trail.coordinates);
+                // Center map on the trail
+                if (mapRef.current) {
+                    mapRef.current.animateToRegion({
+                        ...finalCenter,
+                        latitudeDelta: 0.05,
+                        longitudeDelta: 0.05,
+                    }, 1000);
+                }
+            }
+        } catch (error) {
+            console.error('Error loading trail:', error);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
-    const coords = getCoordinates();
+    const startTracking = async () => {
+        let { status } = await Location.requestForegroundPermissionsAsync();
+        if (status !== 'granted') {
+            Alert.alert('Permission Denied', 'Location access is required for navigation.');
+            return;
+        }
 
-    const initialRegion = {
-        ...coords,
-        latitudeDelta: 0.05,
-        longitudeDelta: 0.05,
+        setIsTracking(true);
+        locationSubscription.current = await Location.watchPositionAsync(
+            {
+                accuracy: Location.Accuracy.High,
+                distanceInterval: 10,
+            },
+            (location) => {
+                const newCoords = {
+                    latitude: location.coords.latitude,
+                    longitude: location.coords.longitude,
+                };
+                setUserLocation(newCoords);
+                checkTrailStatus(newCoords);
+            }
+        );
     };
 
-    const handleGetDirections = () => {
-        const placeName = destinationData?.name ? destinationData.name.replace(/\s+/g, '+') : "Mount+Everest+Base+Camp";
-        const url = Platform.select({
-            ios: `maps:0,0?q=${placeName}`,
-            android: `geo:0,0?q=${placeName}`,
-        });
+    const stopTracking = () => {
+        if (locationSubscription.current) {
+            locationSubscription.current.remove();
+            locationSubscription.current = null;
+        }
+        setIsTracking(false);
+    };
 
-        Linking.canOpenURL(url).then(supported => {
-            if (supported) {
-                Linking.openURL(url);
-            } else {
-                Linking.openURL(`https://www.google.com/maps/dir/?api=1&destination=${placeName}`);
+    const checkTrailStatus = (coords) => {
+        if (trailCoords.length === 0) return;
+
+        let minDistance = Infinity;
+        let nearestIndex = -1;
+
+        trailCoords.forEach((p, index) => {
+            const dist = TrailService.getDistanceFromLatLonInKm(
+                coords.latitude, coords.longitude,
+                p.latitude, p.longitude
+            );
+            if (dist < minDistance) {
+                minDistance = dist;
+                nearestIndex = index;
             }
         });
+
+        if (minDistance > 0.1) {
+            setOffPath(true);
+        } else {
+            setOffPath(false);
+        }
     };
 
     return (
         <View style={styles.container}>
             <MapView
+                ref={mapRef}
                 style={styles.map}
-                initialRegion={initialRegion}
+                initialRegion={{
+                    ...center,
+                    latitudeDelta: 0.05,
+                    longitudeDelta: 0.05,
+                }}
                 provider={PROVIDER_GOOGLE}
                 mapType={Platform.OS === 'android' ? "none" : "standard"}
+                showsUserLocation={true}
+                followsUserLocation={isTracking}
             >
-                {/* Open Street Map Tiles */}
                 <UrlTile
                     urlTemplate="https://tile.openstreetmap.org/{z}/{x}/{y}.png"
                     maximumZ={19}
-                    flipY={false}
                 />
 
+                {trailCoords.length > 0 && (
+                    <Polyline
+                        coordinates={trailCoords}
+                        strokeColor="#FF3B30"
+                        strokeWidth={4}
+                    />
+                )}
+
                 <Marker
-                    coordinate={coords}
-                    title={destinationData?.name || "Everest Base Camp"}
-                    description={destinationData?.location || "Solukhumbu, Nepal"}
-                />
+                    coordinate={center}
+                    title={destinationData?.name || "Target"}
+                >
+                    <View style={styles.targetIcon}>
+                        <Ionicons name="flag" size={20} color="white" />
+                    </View>
+                </Marker>
             </MapView>
 
             <SafeAreaView style={styles.headerLayer}>
-                <TouchableOpacity
-                    onPress={() => navigation.goBack()}
-                    style={styles.backBtn}
-                >
-                    <Ionicons name="chevron-back" size={28} color="#1C3D3E" />
-                </TouchableOpacity>
+                <View style={styles.headerRow}>
+                    <TouchableOpacity
+                        onPress={() => navigation.goBack()}
+                        style={styles.backBtn}
+                    >
+                        <Ionicons name="chevron-back" size={28} color="#1C3D3E" />
+                    </TouchableOpacity>
+                    
+                    {offPath && (
+                        <View style={styles.warningPill}>
+                            <Ionicons name="warning" size={16} color="white" />
+                            <Text style={styles.warningText}>OFF TRAIL</Text>
+                        </View>
+                    )}
+                </View>
             </SafeAreaView>
 
-            {/* Overlay Info Card */}
-            <View style={styles.overlayCard}>
-                <View style={styles.infoTextContainer}>
-                    <Text style={styles.infoTitle}>{destinationData?.name || "Everest Base Camp"}</Text>
-                    <Text style={styles.infoSubtitle}>{destinationData?.location || "Solukhumbu, Nepal"}</Text>
+            {/* Bottom Controls */}
+            <View style={styles.bottomSheet}>
+                <View style={styles.btnRow}>
+                    <TouchableOpacity
+                        style={[styles.actionBtn, isTracking ? styles.stopBtn : styles.startBtn]}
+                        onPress={isTracking ? stopTracking : startTracking}
+                    >
+                        <Ionicons name={isTracking ? "pause" : "navigate"} size={24} color="white" />
+                        <Text style={styles.btnText}>{isTracking ? "Stop Nav" : "Start Tracking"}</Text>
+                    </TouchableOpacity>
                 </View>
-                <TouchableOpacity
-                    style={styles.directionBtn}
-                    onPress={handleGetDirections}
-                >
-                    <Text style={styles.directionBtnText}>Get Directions</Text>
-                </TouchableOpacity>
             </View>
+
+            {isLoading && (
+                <View style={styles.loadingOverlay}>
+                    <ActivityIndicator size="large" color="#1C3D3E" />
+                    <Text style={styles.loadingText}>Fetching Trail Route...</Text>
+                </View>
+            )}
         </View>
     );
 };
@@ -111,6 +254,11 @@ const styles = StyleSheet.create({
         left: 0,
         right: 0,
     },
+    headerRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 16,
+    },
     backBtn: {
         width: 44,
         height: 44,
@@ -118,62 +266,87 @@ const styles = StyleSheet.create({
         backgroundColor: 'white',
         alignItems: 'center',
         justifyContent: 'center',
-        margin: 16,
         shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
         shadowRadius: 10,
         elevation: 5,
     },
-    overlayCard: {
+    warningPill: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: '#FF3B30',
+        borderRadius: 20,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        marginLeft: 12,
+        gap: 6,
+    },
+    warningText: {
+        color: 'white',
+        fontSize: 12,
+        fontFamily: 'Syne-Bold',
+    },
+    bottomSheet: {
         position: 'absolute',
-        bottom: 50,
+        bottom: 40,
         left: 20,
         right: 20,
         backgroundColor: 'white',
-        borderRadius: 25,
+        borderRadius: 30,
         padding: 24,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.1,
+        shadowRadius: 20,
+        elevation: 10,
+    },
+    btnRow: {
+        flexDirection: 'row',
+        gap: 12,
+    },
+    actionBtn: {
+        flex: 2,
         flexDirection: 'row',
         alignItems: 'center',
-        justifyContent: 'space-between',
-        shadowColor: '#1C3D3E',
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.2,
-        shadowRadius: 15,
-        elevation: 10,
-        borderWidth: 1,
-        borderColor: '#F3F4F4',
+        justifyContent: 'center',
+        paddingVertical: 16,
+        borderRadius: 16,
+        gap: 10,
     },
-    infoTextContainer: {
-        flex: 1,
+    startBtn: {
+        backgroundColor: '#1C3D3E',
     },
-    infoTitle: {
-        fontSize: 20,
+    stopBtn: {
+        backgroundColor: '#4B5D5E',
+    },
+    btnText: {
+        color: 'white',
+        fontSize: 15,
+        fontFamily: 'Syne-Bold',
+    },
+    targetIcon: {
+        width: 32,
+        height: 32,
+        borderRadius: 16,
+        backgroundColor: '#1C3D3E',
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 2,
+        borderColor: 'white',
+    },
+    loadingOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'rgba(255,255,255,0.8)',
+        alignItems: 'center',
+        justifyContent: 'center',
+        zIndex: 2000,
+    },
+    loadingText: {
+        marginTop: 15,
+        fontSize: 16,
         fontFamily: 'Syne-Bold',
         color: '#1C3D3E',
-        marginBottom: 4,
-    },
-    infoSubtitle: {
-        fontSize: 14,
-        fontFamily: 'Syne-Regular',
-        color: '#666',
-    },
-    directionBtn: {
-        backgroundColor: '#1C3D3E',
-        borderRadius: 15,
-        paddingVertical: 14,
-        paddingHorizontal: 20,
-        shadowColor: '#1C3D3E',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 5,
-    },
-    directionBtnText: {
-        color: 'white',
-        fontSize: 14,
-        fontFamily: 'Syne-Bold',
     },
 });
 
 export default MapScreen;
-

@@ -12,7 +12,6 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import { auth, db } from '../config/firebase';
 import { onSnapshot, doc } from 'firebase/firestore';
 import { getUnreadCount, subscribeToNotifications, setUnreadCount } from '../utils/notificationStore';
@@ -20,6 +19,21 @@ import { getPlannedTrips, subscribeToPlannedTrips } from '../utils/destinationSt
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const { width } = Dimensions.get('window');
+
+const CategoryCard = ({ category, onSelect, isSelected }) => (
+    <TouchableOpacity 
+        style={[styles.categoryCard, isSelected && styles.categoryCardSelected]} 
+        onPress={() => onSelect(category.name)}
+    >
+        <View style={[styles.categoryImageContainer, isSelected && styles.categoryImageContainerSelected]}>
+            <Image 
+                source={typeof category.image === 'string' ? { uri: category.image } : category.image} 
+                style={styles.categoryImage} 
+            />
+        </View>
+        <Text style={[styles.categoryName, isSelected && styles.categoryNameSelected]}>{category.name}</Text>
+    </TouchableOpacity>
+);
 
 const DestinationCard = ({ destination, navigation }) => (
     <TouchableOpacity
@@ -52,6 +66,11 @@ const HomeScreen = ({ navigation }) => {
     const [unreadCount, setUnreadCountState] = useState(getUnreadCount());
     const [plannedTrips, setPlannedTrips] = useState(getPlannedTrips());
     const [searchQuery, setSearchQuery] = useState('');
+    const [selectedCategory, setSelectedCategory] = useState(null);
+
+    const handleCategorySelect = (categoryName) => {
+        setSelectedCategory(prev => prev === categoryName ? null : categoryName);
+    };
 
     useEffect(() => {
         const unsubscribe = subscribeToNotifications((count) => {
@@ -106,6 +125,7 @@ const HomeScreen = ({ navigation }) => {
             id: 1,
             name: 'TILICHO LAKE',
             location: 'Manang District',
+            category: 'Lakes',
             image: 'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80',
             description: 'Tilicho Lake is situated at an altitude of 4,919 meters in the Annapurna range of the Himalayas. It is often called the highest lake in the world for its size. The trek offers stunning views of Annapurna II, Annapurna III, and Gangapurna.',
             distance: '15km',
@@ -116,6 +136,7 @@ const HomeScreen = ({ navigation }) => {
             id: 2,
             name: 'KHUMAI DADA',
             location: 'Pokhara District',
+            category: 'Mountain',
             image: 'https://images.unsplash.com/photo-1544735716-392fe2489ffa?w=800&q=80',
             description: 'Khumai Dada is a hidden gem in the Machhapuchhre region. This short yet rewarding trek provides a closer look at the iconic Fish Tail mountain and offers a panoramic view of the Pokhara valley.',
             distance: '8km',
@@ -126,6 +147,7 @@ const HomeScreen = ({ navigation }) => {
             id: 3,
             name: 'EVEREST VIEW',
             location: 'Solukhumbu District',
+            category: 'Mountain',
             image: 'https://images.unsplash.com/photo-1571769267292-c07c8eadb1c3?w=800&q=80',
             description: 'The Everest View trek is perfect for those who want to see the world\'s highest peak without the grueling climb to Base Camp. It passes through Sherpa villages and provides breathtaking vistas of Everest, Lhotse, and Ama Dablam.',
             distance: '12km',
@@ -134,15 +156,27 @@ const HomeScreen = ({ navigation }) => {
         }
     ];
 
-    const filteredRecommended = recommendedDestinations.filter(dest =>
-        dest.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        dest.location.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const categories = [
+        { id: 1, name: 'Mountain', image: require('../../assets/mountain image.jpg') },
+        { id: 2, name: 'Hiking Trails', image: require('../../assets/hiking image.avif') },
+        { id: 3, name: 'Lakes', image: require('../../assets/lakes.jpeg') },
+        { id: 4, name: 'Forest', image: require('../../assets/forest.jpeg') },
+        { id: 5, name: 'Base Camp', image: require('../../assets/base camp.jpeg') },
+    ];
 
-    const filteredPlanned = plannedTrips.filter(trek =>
-        trek.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        trek.location.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    const filteredRecommended = recommendedDestinations.filter(dest => {
+        const matchesSearch = dest.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            dest.location.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesCategory = !selectedCategory || dest.category === selectedCategory;
+        return matchesSearch && matchesCategory;
+    });
+
+    const filteredPlanned = plannedTrips.filter(trek => {
+        const matchesSearch = trek.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                            trek.location.toLowerCase().includes(searchQuery.toLowerCase());
+        const matchesCategory = !selectedCategory || trek.category === selectedCategory;
+        return matchesSearch && matchesCategory;
+    });
 
     const noResults = searchQuery.length > 0 && filteredRecommended.length === 0 && filteredPlanned.length === 0;
 
@@ -150,13 +184,8 @@ const HomeScreen = ({ navigation }) => {
         <View style={styles.container}>
             <StatusBar barStyle="dark-content" backgroundColor="#fff" />
             <SafeAreaView style={{ flex: 1 }}>
-                <ScrollView
-                    style={styles.scrollView}
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={styles.scrollContent}
-                >
-                    {/* Header Section */}
-                    <View style={styles.header}>
+                    {/* Fixed Header Section */}
+                    <View style={styles.fixedHeader}>
                         <View style={styles.headerTop}>
                             <View style={styles.profileRow}>
                                 <View style={styles.avatarBorder}>
@@ -184,6 +213,12 @@ const HomeScreen = ({ navigation }) => {
                         </View>
                     </View>
 
+                <ScrollView
+                    style={styles.scrollView}
+                    showsVerticalScrollIndicator={false}
+                    contentContainerStyle={styles.scrollContent}
+                >
+
                     {/* Search Bar */}
                     <View style={styles.searchContainer}>
                         <View style={styles.searchBar}>
@@ -201,6 +236,24 @@ const HomeScreen = ({ navigation }) => {
                                 </TouchableOpacity>
                             )}
                         </View>
+                    </View>
+
+                    {/* Categories Section */}
+                    <View style={styles.categorySection}>
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={styles.categoryList}
+                        >
+                            {categories.map((cat) => (
+                                <CategoryCard 
+                                    key={cat.id} 
+                                    category={cat} 
+                                    onSelect={handleCategorySelect}
+                                    isSelected={selectedCategory === cat.name}
+                                />
+                            ))}
+                        </ScrollView>
                     </View>
 
                     {noResults ? (
@@ -278,9 +331,16 @@ const styles = StyleSheet.create({
     scrollContent: {
         paddingTop: 10,
     },
-    header: {
+    fixedHeader: {
         paddingHorizontal: 20,
-        marginBottom: 20,
+        paddingBottom: 15,
+        backgroundColor: '#fff',
+        zIndex: 10,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 5,
+        elevation: 3,
     },
     headerTop: {
         flexDirection: 'row',
@@ -349,7 +409,7 @@ const styles = StyleSheet.create({
         color: '#000',
     },
     section: {
-        marginBottom: 10,
+        marginBottom: 25,
     },
     sectionHeader: {
         flexDirection: 'row',
@@ -359,12 +419,12 @@ const styles = StyleSheet.create({
         marginBottom: 15,
     },
     sectionTitle: {
-        fontSize: 14,
+        fontSize: 18,
         fontFamily: 'Syne-Bold',
         color: '#000',
     },
     seeAll: {
-        fontSize: 14,
+        fontSize: 15,
         fontFamily: 'Syne-Bold',
         color: '#4B5D5E',
     },
@@ -472,6 +532,51 @@ const styles = StyleSheet.create({
         fontFamily: 'Syne-Regular',
         color: '#999',
         marginTop: 5,
+    },
+    categorySection: {
+        marginTop: 5,
+        marginBottom: 25,
+        paddingTop: 8, // Added padding to prevent clipping during "selected" scale effect
+    },
+    categoryList: {
+        paddingLeft: 20,
+        paddingRight: 10,
+    },
+    categoryCard: {
+        alignItems: 'center',
+        marginRight: 20,
+    },
+    categoryImageContainer: {
+        width: 64,
+        height: 64,
+        borderRadius: 32,
+        backgroundColor: '#F0F0F0',
+        padding: 2,
+        borderWidth: 1.5,
+        borderColor: '#1C3D3E',
+        marginBottom: 8,
+    },
+    categoryImage: {
+        width: '100%',
+        height: '100%',
+        borderRadius: 30,
+        resizeMode: 'cover',
+    },
+    categoryName: {
+        fontSize: 12,
+        fontFamily: 'Syne-Bold',
+        color: '#1C3D3E',
+    },
+    categoryCardSelected: {
+        transform: [{ scale: 1.05 }],
+    },
+    categoryImageContainerSelected: {
+        borderColor: '#4B5D5E',
+        backgroundColor: '#fff',
+        borderWidth: 3,
+    },
+    categoryNameSelected: {
+        color: '#4B5D5E',
     },
 });
 
