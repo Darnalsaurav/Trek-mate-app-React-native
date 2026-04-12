@@ -36,6 +36,7 @@ const MapScreen = ({ route, navigation }) => {
 
     useEffect(() => {
         loadTrailData();
+        startTracking();
         return () => {
             if (locationSubscription.current) {
                 locationSubscription.current.remove();
@@ -184,8 +185,8 @@ const MapScreen = ({ route, navigation }) => {
                 {trailCoords.length > 0 && (
                     <Polyline
                         coordinates={trailCoords}
-                        strokeColor="#FF3B30"
-                        strokeWidth={4}
+                        strokeColor="#FF0000"
+                        strokeWidth={6}
                     />
                 )}
 

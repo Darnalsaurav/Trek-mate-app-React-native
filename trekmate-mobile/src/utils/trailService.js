@@ -32,10 +32,10 @@ export const TrailService = {
             const query = `
                 [out:json][timeout:25];
                 (
-                  way["hiking"="yes"](around:3000, ${centerCoords.latitude}, ${centerCoords.longitude});
-                  way["route"="hiking"](around:3000, ${centerCoords.latitude}, ${centerCoords.longitude});
-                  way["highway"="footway"](around:3000, ${centerCoords.latitude}, ${centerCoords.longitude});
-                  way["highway"="path"](around:3000, ${centerCoords.latitude}, ${centerCoords.longitude});
+                  way["hiking"="yes"](around:5000, ${centerCoords.latitude}, ${centerCoords.longitude});
+                  way["route"="hiking"](around:5000, ${centerCoords.latitude}, ${centerCoords.longitude});
+                  way["highway"="footway"](around:5000, ${centerCoords.latitude}, ${centerCoords.longitude});
+                  way["highway"="path"](around:5000, ${centerCoords.latitude}, ${centerCoords.longitude});
                 );
                 out body;
                 >;

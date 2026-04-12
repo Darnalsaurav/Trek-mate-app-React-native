@@ -14,17 +14,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { Modal, FlatList as RNFlatList } from 'react-native';
 import { db, auth } from '../config/firebase';
-import { 
-    collection, 
-    addDoc, 
-    query, 
-    orderBy, 
-    onSnapshot, 
-    serverTimestamp, 
+import {
+    collection,
+    addDoc,
+    query,
+    orderBy,
+    onSnapshot,
+    serverTimestamp,
     where,
     doc,
     getDoc,
-    updateDoc 
+    updateDoc
 } from 'firebase/firestore';
 import { getChatId } from '../utils/chatUtils';
 
@@ -72,11 +72,11 @@ const ChatScreen = ({ route, navigation }) => {
         try {
             const groupRef = doc(db, 'groups', chatUser.id);
             const groupSnap = await getDoc(groupRef);
-            
+
             if (groupSnap.exists()) {
                 const memberUids = groupSnap.data().members || [];
                 const memberData = [];
-                
+
                 // Fetch profiles for all UIDs
                 for (const uid of memberUids) {
                     const userSnap = await getDoc(doc(db, 'users', uid));
@@ -158,8 +158,8 @@ const ChatScreen = ({ route, navigation }) => {
                     <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backBtn}>
                         <Ionicons name="chevron-back" size={28} color="#374151" />
                     </TouchableOpacity>
-                    <TouchableOpacity 
-                        style={styles.headerInfo} 
+                    <TouchableOpacity
+                        style={styles.headerInfo}
                         onPress={fetchMembers}
                         activeOpacity={0.7}
                     >
@@ -224,7 +224,7 @@ const ChatScreen = ({ route, navigation }) => {
                                     <Ionicons name="close" size={24} color="#1C3D3E" />
                                 </TouchableOpacity>
                             </View>
-                            
+
                             {loadingMembers ? (
                                 <View style={styles.loadingContainer}>
                                     <Text style={styles.loadingText}>Fetching trekkers...</Text>
@@ -235,9 +235,9 @@ const ChatScreen = ({ route, navigation }) => {
                                     keyExtractor={item => item.id}
                                     renderItem={({ item }) => (
                                         <View style={styles.memberItem}>
-                                            <Image 
-                                                source={{ uri: item.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png' }} 
-                                                style={styles.memberAvatar} 
+                                            <Image
+                                                source={{ uri: item.photoURL || 'https://cdn-icons-png.flaticon.com/512/149/149071.png' }}
+                                                style={styles.memberAvatar}
                                             />
                                             <View>
                                                 <Text style={styles.memberName}>{item.displayName || item.email?.split('@')[0] || 'Trekker'}</Text>

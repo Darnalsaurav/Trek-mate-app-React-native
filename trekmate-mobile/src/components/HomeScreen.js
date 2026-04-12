@@ -238,6 +238,8 @@ const HomeScreen = ({ navigation }) => {
                         </View>
                     </View>
 
+
+
                     {/* Categories Section */}
                     <View style={styles.categorySection}>
                         <ScrollView
@@ -387,7 +389,7 @@ const styles = StyleSheet.create({
     },
     searchContainer: {
         paddingHorizontal: 20,
-        marginBottom: 25,
+        marginBottom: 15,
     },
     searchBar: {
         flexDirection: 'row',
